@@ -369,7 +369,14 @@ const app = {
 
     // Seletor de período
     document.getElementById('btnPrevMonth').addEventListener('click', () => {
-      this.currentDate.setMonth(this.currentDate.getMonth() - 1);
+      const prevDate = new Date(this.currentDate);
+      prevDate.setMonth(prevDate.getMonth() - 1);
+      const prevKey = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
+      if (prevKey < '2026-10') {
+        this.showToast('O controle financeiro inicia a partir de Outubro de 2026.');
+        return;
+      }
+      this.currentDate = prevDate;
       this.updatePeriodDisplay();
       this.renderAll();
     });
@@ -448,6 +455,10 @@ const app = {
   },
 
   setPeriod(monthKey) {
+    if (monthKey < '2026-10') {
+      this.showToast('O controle financeiro inicia a partir de Outubro de 2026.');
+      return;
+    }
     const [y, m] = monthKey.split('-').map(Number);
     this.currentDate = new Date(y, m - 1, 1);
     this.updatePeriodDisplay();
@@ -479,6 +490,7 @@ const app = {
     [2026, 2027].forEach(year => {
       months.forEach((name, idx) => {
         const k = `${year}-${String(idx + 1).padStart(2, '0')}`;
+        if (k < '2026-10') return; // Contabilizar a partir de Outubro/2026
         const isSel = (k === selectedKey) ? 'selected' : '';
         options.push(`<option value="${k}" ${isSel}>${name} / ${year}</option>`);
       });
@@ -601,6 +613,41 @@ const app = {
   // CÁLCULOS PRINCIPAIS POR MÊS
   // ==========================================
   getMonthTotals(monthKey = this.getCurrentMonthKey()) {
+    // Não contabilizar meses anteriores a Outubro de 2026 (início do controle)
+    if (monthKey < '2026-10') {
+      return {
+        monthKey,
+        isBeforeStart: true,
+        totalFaturas: 0,
+        faturasPendentes: 0,
+        salarioVitor: 0,
+        salarioDia15: 0,
+        salarioDia30: 0,
+        salarioAndressa: 0,
+        salariosTotal: 0,
+        salarioDia15Recebido: 0,
+        salarioDia30Recebido: 0,
+        salariosRecebidosTotal: 0,
+        salariosPendentesTotal: 0,
+        consultoriasDoMes: [],
+        consultoriasRecebidas: 0,
+        consultoriasPendentes: 0,
+        consultoriasTotal: 0,
+        totalGeralMes: 0,
+        totalRecebidoMes: 0,
+        totalPendenteMes: 0,
+        totalEntradas: 0,
+        totalEntradasPrevistas: 0,
+        despesasFixas: 0,
+        despesasVariaveis: 0,
+        totalDespesasCadastradas: 0,
+        totalDespesasComFaturas: 0,
+        totalDespesasPendentes: 0,
+        sobraMes: 0,
+        sobraRealizada: 0
+      };
+    }
+
     // Faturas de Cartões do Mês
     const currentInvoices = this.data.creditCards.map(c => {
       const inv = this.getCardInvoice(c, monthKey);
@@ -1469,7 +1516,11 @@ const app = {
     if (btn2027) btn2027.classList.toggle('active', this.evolutionYear === 2027);
 
     const badgeEl = document.getElementById('evolutionChartBadge');
-    if (badgeEl) badgeEl.textContent = `Ano de ${this.evolutionYear}`;
+    if (badgeEl) {
+      badgeEl.textContent = (this.evolutionYear === 2026) 
+        ? 'Ano de 2026 (Outubro a Dezembro)' 
+        : `Ano de ${this.evolutionYear} (Janeiro a Dezembro)`;
+    }
 
     this.renderEvolutionSection();
   },
@@ -1484,13 +1535,18 @@ const app = {
       'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
     ];
 
+    // Para 2026, contabilizar estritamente a partir de Outubro (mês 10)
+    const startMonth = (year === 2026) ? 10 : 1;
+    const endMonth = 12;
+    const monthsCount = (endMonth - startMonth + 1);
+
     let sumEntradas = 0;
     let sumDespesas = 0;
     let sumSobra = 0;
     let bestMonth = null;
     let maxSobra = -Infinity;
 
-    for (let m = 1; m <= 12; m++) {
+    for (let m = startMonth; m <= endMonth; m++) {
       const monthKey = `${year}-${String(m).padStart(2, '0')}`;
       const t = this.getMonthTotals(monthKey);
       const name = monthNames[m - 1];
@@ -1512,21 +1568,29 @@ const app = {
       });
     }
 
-    const mediaEntradas = sumEntradas / 12;
-    const mediaDespesas = sumDespesas / 12;
-    const mediaSobra = sumSobra / 12;
+    const mediaEntradas = sumEntradas / monthsCount;
+    const mediaDespesas = sumDespesas / monthsCount;
+    const mediaSobra = sumSobra / monthsCount;
 
     const mediaEntradasEl = document.getElementById('evolucaoMediaEntradas');
     if (mediaEntradasEl) mediaEntradasEl.textContent = formatMoney(mediaEntradas);
 
     const totalEntradasAnoEl = document.getElementById('evolucaoTotalEntradasAno');
-    if (totalEntradasAnoEl) totalEntradasAnoEl.textContent = `Total no ano: ${formatMoney(sumEntradas)}`;
+    if (totalEntradasAnoEl) {
+      totalEntradasAnoEl.textContent = (year === 2026)
+        ? `Total (Out - Dez / ${monthsCount} meses): ${formatMoney(sumEntradas)}`
+        : `Total no ano (12 meses): ${formatMoney(sumEntradas)}`;
+    }
 
     const mediaDespesasEl = document.getElementById('evolucaoMediaDespesas');
     if (mediaDespesasEl) mediaDespesasEl.textContent = formatMoney(mediaDespesas);
 
     const totalDespesasAnoEl = document.getElementById('evolucaoTotalDespesasAno');
-    if (totalDespesasAnoEl) totalDespesasAnoEl.textContent = `Contas + Faturas no ano: ${formatMoney(sumDespesas)}`;
+    if (totalDespesasAnoEl) {
+      totalDespesasAnoEl.textContent = (year === 2026)
+        ? `Despesas (Out - Dez): ${formatMoney(sumDespesas)}`
+        : `Contas + Faturas no ano: ${formatMoney(sumDespesas)}`;
+    }
 
     const mediaSobraEl = document.getElementById('evolucaoMediaSobra');
     if (mediaSobraEl) {
@@ -1535,13 +1599,24 @@ const app = {
     }
 
     const totalSobraAnoEl = document.getElementById('evolucaoTotalSobraAno');
-    if (totalSobraAnoEl) totalSobraAnoEl.textContent = `Economia no ano: ${formatMoney(sumSobra)}`;
+    if (totalSobraAnoEl) {
+      totalSobraAnoEl.textContent = (year === 2026)
+        ? `Economia acumulada (Out - Dez): ${formatMoney(sumSobra)}`
+        : `Economia projetada no ano: ${formatMoney(sumSobra)}`;
+    }
 
     const melhorMesEl = document.getElementById('evolucaoMelhorMes');
     if (melhorMesEl && bestMonth) melhorMesEl.textContent = formatMoney(bestMonth.sobra);
 
     const melhorMesNomeEl = document.getElementById('evolucaoMelhorMesNome');
     if (melhorMesNomeEl && bestMonth) melhorMesNomeEl.textContent = `Maior economia em ${bestMonth.name}/${year}`;
+
+    const tableSubEl = document.getElementById('evolutionTableSub');
+    if (tableSubEl) {
+      tableSubEl.textContent = (year === 2026)
+        ? 'Demonstrativo contabilizado a partir de Outubro/2026 (início do controle financeiro).'
+        : 'Demonstrativo completo para os 12 meses do ano de 2027.';
+    }
 
     const tbody = document.getElementById('evolutionTableBody');
     if (tbody) {
@@ -1596,7 +1671,9 @@ const app = {
     const textColor = isDark ? '#94A3B8' : '#475569';
     const gridColor = isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)';
 
-    const labels = monthsData.map(d => d.name.slice(0, 3));
+    const labels = (year === 2026) 
+      ? monthsData.map(d => d.name) 
+      : monthsData.map(d => d.name.slice(0, 3));
     const entradas = monthsData.map(d => d.totalGeralMes);
     const despesas = monthsData.map(d => d.totalDespesasComFaturas);
     const sobras = monthsData.map(d => d.sobraMes);
