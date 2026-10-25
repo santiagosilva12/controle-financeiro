@@ -387,26 +387,52 @@
           </div>
         </div>
 
-        <!-- Cards de Salários Fixos -->
+        <!-- Cards de Salários Fixos e Entradas do Mês -->
         <div class="salary-overview-grid">
 
+          <!-- Salário Dia 15 (Adiantamento) -->
           <div class="salary-card">
+            <div class="salary-header">
+              <div class="user-avatar andressa"><i class="ph-bold ph-calendar-blank"></i></div>
+              <div>
+                <h4>Salário Dia 15</h4>
+                <span class="badge badge-subtle">1ª Quinzena (Adiantamento)</span>
+              </div>
+            </div>
+            <div class="salary-amount text-accent-blue" id="salaryDia15Display">R$ 0,00</div>
+          </div>
+
+          <!-- Salário Dia 30 (Fechamento) -->
+          <div class="salary-card">
+            <div class="salary-header">
+              <div class="user-avatar andressa"><i class="ph-bold ph-calendar-check"></i></div>
+              <div>
+                <h4>Salário Dia 30</h4>
+                <span class="badge badge-subtle">2ª Quinzena (Fechamento)</span>
+              </div>
+            </div>
+            <div class="salary-amount text-accent-blue" id="salaryDia30Display">R$ 0,00</div>
+          </div>
+
+          <!-- Total Salários Andressa -->
+          <div class="salary-card highlight-income">
             <div class="salary-header">
               <div class="user-avatar andressa">A</div>
               <div>
-                <h4>Salário Andressa</h4>
-                <span class="badge badge-subtle">Renda Fixa</span>
+                <h4>Total Salários Andressa</h4>
+                <span class="badge badge-blue">CLT Mensal (15 + 30)</span>
               </div>
             </div>
             <div class="salary-amount" id="salaryAndressaDisplay">R$ 0,00</div>
           </div>
 
+          <!-- Consultorias no Mês Selecionado -->
           <div class="salary-card highlight-income">
             <div class="salary-header">
               <div class="user-avatar consultoria"><i class="ph-bold ph-briefcase"></i></div>
               <div>
                 <h4>Consultorias no Mês</h4>
-                <span class="badge badge-green" id="consultanciesCountBadge">0 projetos</span>
+                <span class="badge badge-green" id="consultanciesCountBadge">0 no mês</span>
               </div>
             </div>
             <div class="salary-amount text-success" id="consultancyTotalDisplay">R$ 0,00</div>
@@ -417,7 +443,7 @@
         <div class="table-container">
           <div class="table-header">
             <h3>Entradas de Consultoria</h3>
-            <span class="table-sub">Registros de trabalhos avulsos e clientes</span>
+            <span class="table-sub" id="consultancyPeriodSub">Registros de trabalhos avulsos e clientes previstos ou recebidos no mês selecionado</span>
           </div>
           <div class="table-responsive">
             <table class="data-table">
@@ -473,6 +499,10 @@
 
         <!-- Tabela de Despesas -->
         <div class="table-container">
+          <div class="table-header">
+            <h3>Lançamentos de Despesas do Mês</h3>
+            <span class="table-sub" id="expensesPeriodSub">Contas fixas recorrentes, despesas variáveis do mês selecionado e faturas dos cartões somadas</span>
+          </div>
           <div class="table-responsive">
             <table class="data-table">
               <thead>

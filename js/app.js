@@ -41,6 +41,8 @@ const formatDate = (dateStr) => {
 const defaultData = {
   salaries: {
     vitor: 0,
+    dia15: 2900.00,
+    dia30: 2900.00,
     andressa: 5800.00
   },
   savingsGoal: 2500.00,
@@ -251,30 +253,43 @@ const app = {
     this.renderAll();
   },
 
+  // Normalização de Salários
+  normalizeSalaries(salaries) {
+    if (!salaries) return { vitor: 0, dia15: 2900.00, dia30: 2900.00, andressa: 5800.00 };
+    salaries.vitor = 0;
+    const totalAndressa = Number(salaries.andressa) || 5800.00;
+    if (salaries.dia15 === undefined || salaries.dia30 === undefined) {
+      salaries.dia15 = totalAndressa / 2;
+      salaries.dia30 = totalAndressa - salaries.dia15;
+    }
+    salaries.dia15 = Number(salaries.dia15) || 0;
+    salaries.dia30 = Number(salaries.dia30) || 0;
+    salaries.andressa = salaries.dia15 + salaries.dia30;
+    return salaries;
+  },
+
   // Persistência
   loadData() {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       try {
         this.data = JSON.parse(saved);
-        if (this.data && this.data.salaries) {
-          this.data.salaries.vitor = 0;
-        }
-        if (this.data && this.data.fgts) {
-          this.data.fgts.vitor = 0;
-        }
-        if (this.data && this.data.creditCards) {
-          this.data.creditCards.forEach(c => {
-            if (!c.monthlyInvoices) {
-              c.monthlyInvoices = {};
-            }
-            if (!c.monthlyInvoices['2026-10'] && c.invoiceAmount !== undefined) {
-              c.monthlyInvoices['2026-10'] = {
-                amount: Number(c.invoiceAmount) || 0,
-                isPaid: !!c.isPaid
-              };
-            }
-          });
+        if (this.data) {
+          this.data.salaries = this.normalizeSalaries(this.data.salaries);
+          if (this.data.fgts) this.data.fgts.vitor = 0;
+          if (this.data.creditCards) {
+            this.data.creditCards.forEach(c => {
+              if (!c.monthlyInvoices) {
+                c.monthlyInvoices = {};
+              }
+              if (!c.monthlyInvoices['2026-10'] && c.invoiceAmount !== undefined) {
+                c.monthlyInvoices['2026-10'] = {
+                  amount: Number(c.invoiceAmount) || 0,
+                  isPaid: !!c.isPaid
+                };
+              }
+            });
+          }
         }
       } catch (e) {
         console.error('Erro ao ler dados salvos, usando padrão:', e);
@@ -512,6 +527,31 @@ const app = {
     }
   },
 
+  // Helper para verificar se uma despesa está paga no mês selecionado
+  isExpensePaid(expense, monthKey = this.getCurrentMonthKey()) {
+    if (expense.paidMonths && expense.paidMonths[monthKey] !== undefined) {
+      return !!expense.paidMonths[monthKey];
+    }
+    // Se for variável do próprio mês e marcada como isPaid
+    if (expense.type === 'variavel' && expense.dueDate && expense.dueDate.startsWith(monthKey)) {
+      return !!expense.isPaid;
+    }
+    // Fallback inicial para mês de referência 2026-10
+    if (monthKey === '2026-10') {
+      return !!expense.isPaid;
+    }
+    return false;
+  },
+
+  // Helper para obter a data de vencimento da despesa adequada ao mês selecionado
+  getExpenseDueDateForMonth(expense, monthKey = this.getCurrentMonthKey()) {
+    if (expense.type === 'fixa') {
+      const origDay = expense.dueDate ? expense.dueDate.split('-')[2] : '10';
+      return `${monthKey}-${String(origDay).padStart(2, '0')}`;
+    }
+    return expense.dueDate || `${monthKey}-10`;
+  },
+
   // ==========================================
   // CÁLCULOS PRINCIPAIS
   // ==========================================
@@ -529,8 +569,10 @@ const app = {
     const fgtsAndressa = Number(this.data.fgts?.andressa) || 0;
     const fgtsTotal = fgtsAndressa;
 
-    // Faturas de Cartões (Mês Ativo)
+    // Mês Selecionado na Barra de Navegação
     const monthKey = this.getCurrentMonthKey();
+
+    // Faturas de Cartões do Mês Selecionado
     const currentInvoices = this.data.creditCards.map(c => {
       const inv = this.getCardInvoice(c, monthKey);
       return { card: c, invoice: inv };
@@ -541,30 +583,38 @@ const app = {
       .filter(item => !item.invoice.isPaid)
       .reduce((acc, item) => acc + (Number(item.invoice.amount) || 0), 0);
 
-    // Salários Fixos
-    const salarioVitor = Number(this.data.salaries?.vitor) || 0;
-    const salarioAndressa = Number(this.data.salaries?.andressa) || 0;
-    const salariosTotal = salarioVitor + salarioAndressa;
+    // Salários Fixos (Dia 15 e Dia 30)
+    const salarioVitor = 0;
+    const salarioDia15 = Number(this.data.salaries?.dia15) ?? 2900.00;
+    const salarioDia30 = Number(this.data.salaries?.dia30) ?? 2900.00;
+    const salarioAndressa = salarioDia15 + salarioDia30;
+    const salariosTotal = salarioAndressa;
 
-    // Consultorias
-    const consultoriasRecebidas = this.data.consultancies
+    // Consultorias (PUXAR APENAS AS DO MÊS SELECIONADO)
+    const consultoriasDoMes = this.data.consultancies.filter(c => c.date && c.date.startsWith(monthKey));
+    const consultoriasRecebidas = consultoriasDoMes
       .filter(c => c.status === 'recebido')
       .reduce((acc, c) => acc + (Number(c.amount) || 0), 0);
-    const consultoriasPendentes = this.data.consultancies
+    const consultoriasPendentes = consultoriasDoMes
       .filter(c => c.status === 'pendente')
       .reduce((acc, c) => acc + (Number(c.amount) || 0), 0);
     const consultoriasTotal = consultoriasRecebidas + consultoriasPendentes;
 
-    // Total de Entradas
+    // Total de Entradas no Mês (Salários Fixos + Consultorias Recebidas)
     const totalEntradas = salariosTotal + consultoriasRecebidas;
+    const totalEntradasPrevistas = salariosTotal + consultoriasTotal;
 
-    // Despesas (Fixas + Variáveis)
+    // Despesas do Mês:
+    // 1. Contas Fixas (ocorrem todo mês)
     const despesasFixas = this.data.expenses
       .filter(e => e.type === 'fixa')
       .reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
+
+    // 2. Despesas Variáveis (SOMENTE as que vencem no mês selecionado)
     const despesasVariaveis = this.data.expenses
-      .filter(e => e.type === 'variavel')
+      .filter(e => e.type === 'variavel' && e.dueDate && e.dueDate.startsWith(monthKey))
       .reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
+
     const totalDespesasCadastradas = despesasFixas + despesasVariaveis;
 
     // Despesas Totais do Mês = Contas Cadastradas + Faturas de Cartão
@@ -572,6 +622,17 @@ const app = {
 
     // Sobra Líquida do Mês
     const sobraMes = totalEntradas - totalDespesasComFaturas;
+
+    // Contas Pendentes a Pagar no Mês Selecionado
+    const contasFixasPendentes = this.data.expenses
+      .filter(e => e.type === 'fixa' && !this.isExpensePaid(e, monthKey))
+      .reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
+
+    const despesasVariaveisPendentes = this.data.expenses
+      .filter(e => e.type === 'variavel' && e.dueDate && e.dueDate.startsWith(monthKey) && !this.isExpensePaid(e, monthKey))
+      .reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
+
+    const totalDespesasPendentes = contasFixasPendentes + despesasVariaveisPendentes + faturasPendentes;
 
     // Patrimônio Líquido Total Consolidado
     // (Saldo em Contas + FGTS) - Faturas de Cartões Pendentes
@@ -586,16 +647,21 @@ const app = {
       totalFaturas,
       faturasPendentes,
       salarioVitor,
+      salarioDia15,
+      salarioDia30,
       salarioAndressa,
       salariosTotal,
+      consultoriasDoMes,
       consultoriasRecebidas,
       consultoriasPendentes,
       consultoriasTotal,
       totalEntradas,
+      totalEntradasPrevistas,
       despesasFixas,
       despesasVariaveis,
       totalDespesasCadastradas,
       totalDespesasComFaturas,
+      totalDespesasPendentes,
       sobraMes,
       patrimonioTotal
     };
@@ -662,8 +728,10 @@ const app = {
 
   // Resumos Rápidos da Dashboard
   renderQuickSummaries() {
-    // 1. Faturas Rápidas
     const monthKey = this.getCurrentMonthKey();
+    const monthName = this.getMonthName();
+
+    // 1. Faturas Rápidas do Mês
     const cardsListEl = document.getElementById('quickCardsList');
     cardsListEl.innerHTML = this.data.creditCards.map(c => {
       const inv = this.getCardInvoice(c, monthKey);
@@ -685,12 +753,13 @@ const app = {
       `;
     }).join('');
 
-    // 2. Consultorias Rápidas
+    // 2. Consultorias do Mês Ativo
     const consultancyListEl = document.getElementById('quickConsultancyList');
-    if (this.data.consultancies.length === 0) {
-      consultancyListEl.innerHTML = '<p class="text-xs text-muted">Nenhuma consultoria registrada.</p>';
+    const consultoriasMes = this.data.consultancies.filter(c => c.date && c.date.startsWith(monthKey));
+    if (consultoriasMes.length === 0) {
+      consultancyListEl.innerHTML = `<p class="text-xs text-muted">Nenhuma consultoria lançada em ${monthName}.</p>`;
     } else {
-      consultancyListEl.innerHTML = this.data.consultancies.slice(0, 3).map(c => `
+      consultancyListEl.innerHTML = consultoriasMes.slice(0, 3).map(c => `
         <div class="mini-list-item">
           <div class="mini-list-info">
             <div class="mini-icon" style="background: linear-gradient(135deg, #10B981, #059669);">
@@ -708,13 +777,26 @@ const app = {
       `).join('');
     }
 
-    // 3. Próximos Vencimentos de Despesas Pendentes
+    // 3. Próximos Vencimentos de Despesas Pendentes do Mês
     const dueListEl = document.getElementById('quickDueExpensesList');
-    const pendentes = this.data.expenses.filter(e => !e.isPaid).slice(0, 3);
-    if (pendentes.length === 0) {
-      dueListEl.innerHTML = '<p class="text-xs text-success"><i class="ph ph-check-circle"></i> Todas as contas do mês já estão pagas!</p>';
+    
+    // Contas fixas pendentes no mês + variáveis do mês pendentes
+    const pendentesFixas = this.data.expenses
+      .filter(e => e.type === 'fixa' && !this.isExpensePaid(e, monthKey))
+      .map(e => ({
+        ...e,
+        dueDate: this.getExpenseDueDateForMonth(e, monthKey)
+      }));
+
+    const pendentesVariaveis = this.data.expenses
+      .filter(e => e.type === 'variavel' && e.dueDate && e.dueDate.startsWith(monthKey) && !this.isExpensePaid(e, monthKey));
+
+    const todasPendentes = [...pendentesFixas, ...pendentesVariaveis].sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''));
+
+    if (todasPendentes.length === 0) {
+      dueListEl.innerHTML = `<p class="text-xs text-success"><i class="ph ph-check-circle"></i> Todas as contas de ${monthName} já estão pagas!</p>`;
     } else {
-      dueListEl.innerHTML = pendentes.map(e => `
+      dueListEl.innerHTML = todasPendentes.slice(0, 3).map(e => `
         <div class="mini-list-item">
           <div class="mini-list-info">
             <div class="mini-icon" style="background: rgba(239, 68, 68, 0.2); color: #EF4444;">
@@ -996,25 +1078,39 @@ const app = {
   // ==========================================
   renderIncomeSection() {
     const t = this.getTotals();
-    const salaryVitorDisplay = document.getElementById('salaryVitorDisplay');
-    if (salaryVitorDisplay) {
-      salaryVitorDisplay.textContent = formatMoney(t.salarioVitor);
+    const monthKey = this.getCurrentMonthKey();
+    const monthName = this.getMonthName();
+    const year = this.currentDate.getFullYear();
+
+    const salaryDia15Display = document.getElementById('salaryDia15Display');
+    if (salaryDia15Display) {
+      salaryDia15Display.textContent = formatMoney(t.salarioDia15);
+    }
+    const salaryDia30Display = document.getElementById('salaryDia30Display');
+    if (salaryDia30Display) {
+      salaryDia30Display.textContent = formatMoney(t.salarioDia30);
     }
     const salaryAndressaDisplay = document.getElementById('salaryAndressaDisplay');
     if (salaryAndressaDisplay) {
       salaryAndressaDisplay.textContent = formatMoney(t.salarioAndressa);
     }
-    document.getElementById('consultancyTotalDisplay').textContent = formatMoney(t.consultoriasTotal);
-    document.getElementById('consultanciesCountBadge').textContent = `${this.data.consultancies.length} registros`;
 
-    // Tabela de consultorias
+    document.getElementById('consultancyTotalDisplay').textContent = formatMoney(t.consultoriasTotal);
+    document.getElementById('consultanciesCountBadge').textContent = `${t.consultoriasDoMes.length} no mês`;
+
+    const subEl = document.getElementById('consultancyPeriodSub');
+    if (subEl) {
+      subEl.textContent = `Registros de consultorias previstos ou recebidos em ${monthName} / ${year}`;
+    }
+
+    // Tabela de consultorias (SOMENTE AS DO MÊS SELECIONADO)
     const tbody = document.getElementById('consultancyTableBody');
-    if (this.data.consultancies.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding: 24px; color: var(--text-muted);">Nenhuma consultoria registrada ainda. Clique em "Nova Consultoria" para adicionar.</td></tr>`;
+    if (t.consultoriasDoMes.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding: 24px; color: var(--text-muted);"><i class="ph ph-calendar-blank" style="font-size:22px; display:block; margin-bottom:6px;"></i>Nenhuma consultoria lançada para ${monthName} / ${year}. Clique em "Nova Consultoria" para lançar neste mês.</td></tr>`;
       return;
     }
 
-    tbody.innerHTML = this.data.consultancies.map(c => `
+    tbody.innerHTML = t.consultoriasDoMes.map(c => `
       <tr>
         <td>
           <strong>${c.client}</strong>
@@ -1074,7 +1170,14 @@ const app = {
   renderExpensesTable() {
     const monthKey = this.getCurrentMonthKey();
     const monthName = this.getMonthName();
+    const year = this.currentDate.getFullYear();
 
+    const subEl = document.getElementById('expensesPeriodSub');
+    if (subEl) {
+      subEl.textContent = `Contas fixas recorrentes, despesas variáveis de ${monthName}/${year} e faturas de cartões somadas`;
+    }
+
+    // Faturas de Cartões do Mês Selecionado
     const cardExpenses = this.data.creditCards.map(c => {
       const inv = this.getCardInvoice(c, monthKey);
       return {
@@ -1084,13 +1187,30 @@ const app = {
         description: `Fatura ${c.name}`,
         type: 'cartao',
         category: 'Cartão de Crédito',
-        dueDate: `${this.currentDate.getFullYear()}-${String(this.currentDate.getMonth() + 1).padStart(2, '0')}-${String(c.dueDay).padStart(2, '0')}`,
+        dueDate: `${year}-${String(this.currentDate.getMonth() + 1).padStart(2, '0')}-${String(c.dueDay).padStart(2, '0')}`,
         amount: Number(inv.amount) || 0,
         isPaid: inv.isPaid
       };
     });
 
-    let allItems = [...this.data.expenses, ...cardExpenses];
+    // 1. Contas Fixas (ocorrem todo mês, status de pagamento específico para este mês)
+    const fixedExpenses = this.data.expenses
+      .filter(e => e.type === 'fixa')
+      .map(e => ({
+        ...e,
+        dueDate: this.getExpenseDueDateForMonth(e, monthKey),
+        isPaid: this.isExpensePaid(e, monthKey)
+      }));
+
+    // 2. Despesas Variáveis (SOMENTE as cujo dueDate pertence ao mês selecionado)
+    const variableExpenses = this.data.expenses
+      .filter(e => e.type === 'variavel' && e.dueDate && e.dueDate.startsWith(monthKey))
+      .map(e => ({
+        ...e,
+        isPaid: this.isExpensePaid(e, monthKey)
+      }));
+
+    let allItems = [...fixedExpenses, ...variableExpenses, ...cardExpenses];
     let list = [...allItems];
 
     if (this.activeFilter === 'fixa') {
@@ -1110,7 +1230,7 @@ const app = {
 
     const tbody = document.getElementById('expensesTableBody');
     if (list.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding: 24px; color: var(--text-muted);">Nenhuma despesa encontrada para o filtro selecionado.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding: 24px; color: var(--text-muted);"><i class="ph ph-check-circle" style="font-size:22px; display:block; margin-bottom:6px;"></i>Nenhuma despesa encontrada para ${monthName} / ${year} com o filtro atual.</td></tr>`;
       return;
     }
 
@@ -1128,13 +1248,13 @@ const app = {
         ? `<button class="badge ${e.isPaid ? 'badge-green' : 'badge-danger'}" 
                    style="border:none; cursor:pointer;" 
                    onclick="app.toggleCardPaid('${e.cardId}', '${monthKey}')"
-                   title="Alternar pagamento da fatura">
+                   title="Alternar pagamento da fatura de ${monthName}">
              ${e.isPaid ? '✓ Fatura Paga' : '⏳ Pendente'}
            </button>`
         : `<button class="badge ${e.isPaid ? 'badge-green' : 'badge-danger'}" 
                    style="border:none; cursor:pointer;" 
-                   onclick="app.toggleExpensePaid('${e.id}')"
-                   title="Alternar Pago / Pendente">
+                   onclick="app.toggleExpensePaid('${e.id}', '${monthKey}')"
+                   title="Alternar Pago / Pendente para ${monthName}">
              ${e.isPaid ? '✓ Pago' : '⏳ Pendente'}
            </button>`;
 
@@ -1170,13 +1290,21 @@ const app = {
     }).join('');
   },
 
-  toggleExpensePaid(id) {
+  toggleExpensePaid(id, monthKey = this.getCurrentMonthKey()) {
     const expense = this.data.expenses.find(e => e.id === id);
     if (expense) {
-      expense.isPaid = !expense.isPaid;
+      if (!expense.paidMonths) expense.paidMonths = {};
+      const currentStatus = this.isExpensePaid(expense, monthKey);
+      expense.paidMonths[monthKey] = !currentStatus;
+      if (monthKey === this.getCurrentMonthKey()) {
+        expense.isPaid = expense.paidMonths[monthKey];
+      }
       this.saveData();
       this.renderAll();
-      this.showToast(expense.isPaid ? `${expense.description} marcado como PAGO!` : `${expense.description} marcado como PENDENTE.`);
+      const monthLabel = this.formatMonthKeyLabel(monthKey);
+      this.showToast(expense.paidMonths[monthKey] 
+        ? `${expense.description} marcado como PAGO em ${monthLabel}!` 
+        : `${expense.description} marcado como PENDENTE em ${monthLabel}.`);
     }
   },
 
@@ -1381,16 +1509,21 @@ const app = {
 
   // Modal Despesa
   openExpenseModal(editingId = null) {
+    const monthKey = this.getCurrentMonthKey();
+    const defaultDate = `${monthKey}-10`;
     const exp = editingId ? this.data.expenses.find(e => e.id === editingId) : {
       description: '',
       type: 'fixa',
       category: 'Moradia',
       amount: '',
-      dueDate: new Date().toISOString().slice(0, 10),
+      dueDate: defaultDate,
       isPaid: false
     };
 
     const isEdit = !!editingId;
+    const isPaidCurrentMonth = editingId ? this.isExpensePaid(exp, monthKey) : false;
+    const dueDateVal = editingId ? (exp.dueDate || defaultDate) : defaultDate;
+
     const html = `
       <form id="formExpense" onsubmit="event.preventDefault(); app.saveExpense('${editingId || ''}');">
         <div class="form-group">
@@ -1419,14 +1552,14 @@ const app = {
           </div>
           <div class="form-group">
             <label class="form-label">Data de Vencimento</label>
-            <input type="date" id="expDueDate" class="form-control" value="${exp.dueDate}">
+            <input type="date" id="expDueDate" class="form-control" value="${dueDateVal}">
           </div>
         </div>
 
         <div class="form-group">
           <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.9rem;">
-            <input type="checkbox" id="expIsPaid" ${exp.isPaid ? 'checked' : ''} style="width:18px; height:18px;">
-            Esta conta já foi paga este mês?
+            <input type="checkbox" id="expIsPaid" ${isPaidCurrentMonth ? 'checked' : ''} style="width:18px; height:18px;">
+            Esta conta já foi paga no mês de ${this.getMonthName()}?
           </label>
         </div>
 
@@ -1446,6 +1579,7 @@ const app = {
     const amount = parseFloat(document.getElementById('expAmount').value) || 0;
     const dueDate = document.getElementById('expDueDate').value;
     const isPaid = document.getElementById('expIsPaid').checked;
+    const monthKey = this.getCurrentMonthKey();
 
     if (!desc || amount <= 0) {
       alert('Por favor informe a descrição e um valor válido.');
@@ -1455,7 +1589,18 @@ const app = {
     if (editingId) {
       const idx = this.data.expenses.findIndex(e => e.id === editingId);
       if (idx !== -1) {
-        this.data.expenses[idx] = { ...this.data.expenses[idx], description: desc, type, category, amount, dueDate, isPaid };
+        const item = this.data.expenses[idx];
+        if (!item.paidMonths) item.paidMonths = {};
+        item.paidMonths[monthKey] = isPaid;
+        this.data.expenses[idx] = { 
+          ...item, 
+          description: desc, 
+          type, 
+          category, 
+          amount, 
+          dueDate, 
+          isPaid: monthKey === this.getCurrentMonthKey() ? isPaid : item.isPaid 
+        };
       }
     } else {
       this.data.expenses.unshift({
@@ -1465,7 +1610,10 @@ const app = {
         category,
         amount,
         dueDate,
-        isPaid
+        isPaid,
+        paidMonths: {
+          [monthKey]: isPaid
+        }
       });
     }
 
@@ -1481,12 +1629,14 @@ const app = {
 
   // Modal Consultoria
   openConsultancyModal(editingId = null) {
+    const monthKey = this.getCurrentMonthKey();
+    const defaultDate = `${monthKey}-15`;
     const item = editingId ? this.data.consultancies.find(c => c.id === editingId) : {
       client: '',
-      person: 'Vitor',
+      person: 'Andressa',
       description: '',
       amount: '',
-      date: new Date().toISOString().slice(0, 10),
+      date: defaultDate,
       status: 'recebido'
     };
 
@@ -1908,33 +2058,76 @@ const app = {
     this.showToast(`Cartão "${name}" adicionado com sucesso!`);
   },
 
-  // Modal Salário Fixo
+  // Modal Salário Fixo (Dia 15 e Dia 30)
   openSalariesModal() {
+    const salaries = this.normalizeSalaries(this.data.salaries);
+    const dia15 = Number(salaries.dia15) || 2900.00;
+    const dia30 = Number(salaries.dia30) || 2900.00;
+    const total = dia15 + dia30;
+
     const html = `
       <form onsubmit="event.preventDefault(); app.saveSalaries();">
         <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:16px;">
-          Configure o salário líquido fixo recebido mensalmente:
+          Configure os dois pagamentos mensais do salário líquido da Andressa (Dia 15 e Dia 30):
         </p>
-        <div class="form-group">
-          <label class="form-label">Salário Líquido Mensal - Andressa</label>
-          <input type="number" step="0.01" id="salaryAndressaInput" class="form-control" value="${this.data.salaries?.andressa || 0}">
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Salário Dia 15 (Adiantamento)</label>
+            <div style="position:relative;">
+              <span style="position:absolute; left:12px; top:10px; color:var(--text-muted); font-size:0.9rem;">R$</span>
+              <input type="number" step="0.01" id="salaryDia15Input" class="form-control" style="padding-left:36px;" value="${dia15}" oninput="app.updateModalSalariesTotal()">
+            </div>
+            <small style="color:var(--text-muted); font-size:0.75rem;">1ª Quinzena</small>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Salário Dia 30 (Fechamento)</label>
+            <div style="position:relative;">
+              <span style="position:absolute; left:12px; top:10px; color:var(--text-muted); font-size:0.9rem;">R$</span>
+              <input type="number" step="0.01" id="salaryDia30Input" class="form-control" style="padding-left:36px;" value="${dia30}" oninput="app.updateModalSalariesTotal()">
+            </div>
+            <small style="color:var(--text-muted); font-size:0.75rem;">2ª Quinzena</small>
+          </div>
         </div>
+
+        <div style="background:var(--bg-card-solid); border:1px solid var(--border-color); border-radius:var(--radius-md); padding:14px 18px; margin-bottom:18px; display:flex; justify-content:space-between; align-items:center;">
+          <span style="font-size:0.95rem; font-weight:600; color:var(--text-muted);">Total Líquido Mensal:</span>
+          <strong id="modalSalariesTotalDisplay" class="text-success" style="font-size:1.35rem;">${formatMoney(total)}</strong>
+        </div>
+
         <div class="form-footer">
           <button type="button" class="btn-secondary" onclick="app.closeModal()">Cancelar</button>
-          <button type="submit" class="btn-primary">Salvar Salário</button>
+          <button type="submit" class="btn-primary">Salvar Salários</button>
         </div>
       </form>
     `;
-    this.openModal('Salário Fixo Mensal', html);
+    this.openModal('Salário Mensal (Dia 15 e Dia 30)', html);
+  },
+
+  updateModalSalariesTotal() {
+    const d15 = parseFloat(document.getElementById('salaryDia15Input')?.value) || 0;
+    const d30 = parseFloat(document.getElementById('salaryDia30Input')?.value) || 0;
+    const totalEl = document.getElementById('modalSalariesTotalDisplay');
+    if (totalEl) totalEl.textContent = formatMoney(d15 + d30);
   },
 
   saveSalaries() {
-    const a = parseFloat(document.getElementById('salaryAndressaInput').value) || 0;
-    this.data.salaries = { vitor: 0, andressa: a };
+    const d15 = parseFloat(document.getElementById('salaryDia15Input')?.value) || 0;
+    const d30 = parseFloat(document.getElementById('salaryDia30Input')?.value) || 0;
+    const total = d15 + d30;
+
+    this.data.salaries = {
+      vitor: 0,
+      dia15: d15,
+      dia30: d30,
+      andressa: total
+    };
+
     this.saveData();
     this.closeModal();
     this.renderAll();
-    this.showToast('Salário atualizado com sucesso!');
+    this.showToast(`Salários salvos! Dia 15: ${formatMoney(d15)} • Dia 30: ${formatMoney(d30)}`);
   },
 
   // Modal Meta de Poupança
@@ -2089,6 +2282,8 @@ const app = {
         const updatedAt = result.rows[0].updated_at;
         if (cloudData && typeof cloudData === 'object') {
           this.data = cloudData;
+          if (this.data.salaries) this.data.salaries = this.normalizeSalaries(this.data.salaries);
+          if (this.data.fgts) this.data.fgts.vitor = 0;
           localStorage.setItem(STORAGE_KEY, JSON.stringify(this.data));
           this.lastSyncTime = new Date(updatedAt);
           this.updateNeonUI('online', 'Neon Conectado');
