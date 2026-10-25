@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestão Financeira do Casal | Vitor & Andressa</title>
+  <meta name="description" content="Controle financeiro pessoal e conjunto para Vitor e Andressa: saldos Nubank, Rico, Bradesco, FGTS, faturas, consultorias e metas de poupança.">
+  
+  <!-- Fontes Google -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Ícones Phosphor / Boxicons -->
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css"/>
+  
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- CSS Customizado -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="theme-dark">
+  <div class="app-container">
+    <!-- Barra Lateral de Navegação -->
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <div class="brand-icon">
+          <i class="ph-bold ph-trend-up"></i>
+        </div>
+        <div class="brand-text">
+          <h2>Finanças <span>ANDRESSA</span></h2>
+          <p>
+        </div>
+      </div>
+
+      <nav class="nav-menu">
+        <a href="#dashboard" class="nav-item active" data-tab="dashboard">
+          <i class="ph ph-squares-four"></i>
+          <span>Visão Geral</span>
+        </a>
+        <a href="#patrimonio" class="nav-item" data-tab="patrimonio">
+          <i class="ph ph-bank"></i>
+          <span>Bancos & FGTS</span>
+        </a>
+        <a href="#cartoes" class="nav-item" data-tab="cartoes">
+          <i class="ph ph-credit-card"></i>
+          <span>Cartões & Faturas</span>
+        </a>
+        <a href="#receitas" class="nav-item" data-tab="receitas">
+          <i class="ph ph-hand-coins"></i>
+          <span>Salário & Consultorias</span>
+        </a>
+        <a href="#despesas" class="nav-item" data-tab="despesas">
+          <i class="ph ph-receipt"></i>
+          <span>Despesas Fixas & Variáveis</span>
+        </a>
+        <a href="#poupanca" class="nav-item" data-tab="poupanca">
+          <i class="ph ph-piggy-bank"></i>
+          <span>Meta de Poupança</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="theme-toggle-wrapper">
+          <button id="themeToggleBtn" class="btn-theme" title="Alternar Modo Claro / Escuro">
+            <i class="ph ph-moon" id="themeIcon"></i>
+            <span id="themeText">Modo Escuro</span>
+          </button>
+        </div>
+        <div class="backup-actions">
+          <button id="btnExportData" class="btn-secondary btn-sm" title="Baixar cópia de segurança em JSON">
+            <i class="ph ph-download-simple"></i> Backup
+          </button>
+          <button id="btnImportData" class="btn-secondary btn-sm" title="Restaurar dados de backup">
+            <i class="ph ph-upload-simple"></i> Restaurar
+          </button>
+          <input type="file" id="fileImportInput" accept=".json" style="display:none;">
+        </div>
+      </div>
+    </aside>
+
+    <!-- Conteúdo Principal -->
+    <main class="main-content">
+      <!-- Topbar Header -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <button id="mobileMenuBtn" class="mobile-toggle" aria-label="Abrir menu">
+            <i class="ph-bold ph-list"></i>
+          </button>
+          <div class="page-title">
+            <h1 id="pageTitleHeading">Painel Financeiro Geral</h1>
+            <span class="subtitle">Acompanhamento consolidado do mês</span>
+          </div>
+        </div>
+
+        <div class="topbar-right">
+          <!-- Seletor de Mês e Ano -->
+          <div class="period-selector">
+            <button id="btnPrevMonth" class="btn-icon" title="Mês Anterior"><i class="ph ph-caret-left"></i></button>
+            <div class="current-period" id="currentPeriodDisplay">Outubro / 2026</div>
+            <button id="btnNextMonth" class="btn-icon" title="Próximo Mês"><i class="ph ph-caret-right"></i></button>
+          </div>
+
+          <!-- Ação rápida -->
+          <div class="quick-actions">
+            <button class="btn-primary" id="btnQuickAdd">
+              <i class="ph-bold ph-plus"></i> Novo Lançamento
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <!-- SEÇÃO 1: VISÃO GERAL (DASHBOARD) -->
+      <section id="section-dashboard" class="content-section active">
+        <!-- Cards de Resumo Principais (KPIs) -->
+        <div class="kpi-grid">
+          <!-- Saldo Total em Contas -->
+          <div class="kpi-card card-accounts">
+            <div class="kpi-header">
+              <span class="kpi-label">Saldo em Contas</span>
+              <div class="kpi-icon"><i class="ph-bold ph-wallet"></i></div>
+            </div>
+            <div class="kpi-value" id="kpiSaldoContas">R$ 0,00</div>
+            <div class="kpi-footer">
+              <span class="badge badge-subtle">Nubank, Rico & Bradesco</span>
+            </div>
+          </div>
+
+          <!-- FGTS Total -->
+          <div class="kpi-card card-fgts">
+            <div class="kpi-header">
+              <span class="kpi-label">FGTS Acumulado</span>
+              <div class="kpi-icon"><i class="ph-bold ph-shield-check"></i></div>
+            </div>
+            <div class="kpi-value text-accent-blue" id="kpiFgts">R$ 0,00</div>
+            <div class="kpi-footer">
+              <span class="badge badge-blue">Reserva Andressa</span>
+            </div>
+          </div>
+
+          <!-- Total Entradas do Mês -->
+          <div class="kpi-card card-income">
+            <div class="kpi-header">
+              <span class="kpi-label">Total Entradas (Mês)</span>
+              <div class="kpi-icon"><i class="ph-bold ph-arrow-circle-up-right"></i></div>
+            </div>
+            <div class="kpi-value text-success" id="kpiEntradas">R$ 0,00</div>
+            <div class="kpi-footer">
+              <span id="kpiConsultoriaBadge" class="text-xs">Consultorias: R$ 0,00</span>
+            </div>
+          </div>
+
+          <!-- Despesas do Mês -->
+          <div class="kpi-card card-expenses">
+            <div class="kpi-header">
+              <span class="kpi-label">Despesas + Faturas (Mês)</span>
+              <div class="kpi-icon"><i class="ph-bold ph-arrow-circle-down-left"></i></div>
+            </div>
+            <div class="kpi-value text-danger" id="kpiDespesas">R$ 0,00</div>
+            <div class="kpi-footer">
+              <span id="kpiFaturasBadge" class="text-xs">Faturas: R$ 0,00</span>
+            </div>
+          </div>
+
+          <!-- Saldo Líquido do Mês -->
+          <div class="kpi-card card-balance">
+            <div class="kpi-header">
+              <span class="kpi-label">Sobra do Mês</span>
+              <div class="kpi-icon"><i class="ph-bold ph-scales"></i></div>
+            </div>
+            <div class="kpi-value" id="kpiSobraMes">R$ 0,00</div>
+            <div class="kpi-footer">
+              <span class="text-xs" id="kpiSobraDesc">Entradas - Despesas</span>
+            </div>
+          </div>
+
+          <!-- Patrimônio Global Consolidado -->
+          <div class="kpi-card card-networth highlight-card">
+            <div class="kpi-header">
+              <span class="kpi-label">Patrimônio Líquido Total</span>
+              <div class="kpi-icon"><i class="ph-bold ph-diamonds-four"></i></div>
+            </div>
+            <div class="kpi-value text-gold" id="kpiPatrimonioTotal">R$ 0,00</div>
+            <div class="kpi-footer">
+              <span class="text-xs">Contas + Rico + FGTS - Faturas Pendentes</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Barra de Progresso da Poupança do Mês -->
+        <div class="meta-poupanca-banner">
+          <div class="meta-info">
+            <div class="meta-header">
+              <div class="meta-title-wrapper">
+                <i class="ph-bold ph-target text-gold"></i>
+                <h3>Meta de Poupança do Mês</h3>
+              </div>
+              <button class="btn-text-edit" id="btnEditarMeta"><i class="ph ph-pencil-simple"></i> Ajustar Meta</button>
+            </div>
+            <p id="metaStatusText">Você definiu guardar <strong>R$ 1.500,00</strong> este mês.</p>
+          </div>
+          <div class="meta-bar-container">
+            <div class="meta-progress-bar">
+              <div class="meta-progress-fill" id="metaProgressBar" style="width: 0%;"></div>
+            </div>
+            <div class="meta-metrics">
+              <span id="metaGuardadoLabel">Guardado: <strong>R$ 0,00</strong></span>
+              <span id="metaPercentLabel" class="badge badge-gold">0% Concluído</span>
+              <span id="metaRestanteLabel">Faltam: <strong>R$ 0,00</strong></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Seção de Gráficos e Balanço -->
+        <div class="dashboard-charts-grid">
+          <!-- Gráfico de Comparação: Entradas vs Saídas -->
+          <div class="chart-card">
+            <div class="card-header-flex">
+              <h3><i class="ph ph-chart-bar"></i> Fluxo de Caixa Mensal</h3>
+              <span class="badge badge-subtle">Comparativo</span>
+            </div>
+            <div class="chart-wrapper">
+              <canvas id="cashflowChart"></canvas>
+            </div>
+          </div>
+
+          <!-- Gráfico de Distribuição: Onde o Dinheiro Está -->
+          <div class="chart-card">
+            <div class="card-header-flex">
+              <h3><i class="ph ph-chart-pie-slice"></i> Distribuição Patrimonial</h3>
+              <span class="badge badge-subtle">Contas & FGTS</span>
+            </div>
+            <div class="chart-wrapper">
+              <canvas id="distributionChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Atalhos e Resumos Rápidos -->
+        <div class="quick-summary-grid">
+          <!-- Resumo das Faturas dos Cartões -->
+          <div class="summary-card">
+            <div class="card-header-flex">
+              <h4><i class="ph ph-credit-card"></i> Faturas dos Cartões</h4>
+              <button class="btn-link" onclick="app.switchTab('cartoes')">Ver Todos</button>
+            </div>
+            <div id="quickCardsList" class="mini-list"></div>
+          </div>
+
+          <!-- Resumo das Consultorias Recentes -->
+          <div class="summary-card">
+            <div class="card-header-flex">
+              <h4><i class="ph ph-sparkle"></i> Consultorias Recentes</h4>
+              <button class="btn-link" onclick="app.switchTab('receitas')">Ver Todas</button>
+            </div>
+            <div id="quickConsultancyList" class="mini-list"></div>
+          </div>
+
+          <!-- Próximos Vencimentos de Contas Fixas -->
+          <div class="summary-card">
+            <div class="card-header-flex">
+              <h4><i class="ph ph-calendar-check"></i> Próximos Vencimentos</h4>
+              <button class="btn-link" onclick="app.switchTab('despesas')">Ver Despesas</button>
+            </div>
+            <div id="quickDueExpensesList" class="mini-list"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SEÇÃO 2: BANCOS & FGTS -->
+      <section id="section-patrimonio" class="content-section">
+        <div class="section-header-banner">
+          <div>
+            <h2>Contas Bancárias, Investimentos e FGTS</h2>
+            <p>Monitore os saldos disponíveis em cada instituição e o saldo do FGTS da Andressa.</p>
+          </div>
+          <button class="btn-primary" id="btnEditAccounts">
+            <i class="ph-bold ph-pencil-line"></i> Atualizar Saldos
+          </button>
+        </div>
+
+        <div class="accounts-grid" id="accountsCardsGrid">
+          <!-- Renderizado via JS -->
+        </div>
+
+        <!-- Caixa de FGTS Detalhado -->
+        <div class="fgts-card-detail">
+          <div class="fgts-header">
+            <div class="fgts-icon-title">
+              <div class="fgts-badge-icon"><i class="ph-bold ph-briefcase"></i></div>
+              <div>
+                <h3>Fundo de Garantia (FGTS)</h3>
+                <p>Reserva patrimonial da Andressa vinculada ao trabalho CLT</p>
+              </div>
+            </div>
+            <button class="btn-secondary" id="btnEditFgts">
+              <i class="ph ph-pencil"></i> Atualizar Saldo FGTS
+            </button>
+          </div>
+          <div class="fgts-breakdown">
+            <div class="fgts-item">
+              <span class="label">Titular</span>
+              <strong class="value">Andressa (CLT)</strong>
+            </div>
+            <div class="fgts-item highlight">
+              <span class="label">Saldo FGTS Andressa</span>
+              <strong class="value text-accent-blue" id="fgtsAndressaVal">R$ 0,00</strong>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SEÇÃO 3: CARTÕES & FATURAS -->
+      <section id="section-cartoes" class="content-section">
+        <div class="section-header-banner">
+          <div>
+            <h2>Faturas de Cartões de Crédito</h2>
+            <p>Controle do valor atual da fatura, limites, datas de vencimento e status de pagamento.</p>
+          </div>
+          <div class="btn-group">
+            <button class="btn-secondary" id="btnManageMonthlyInvoices">
+              <i class="ph ph-calendar-plus"></i> Lançar Faturas Mês a Mês
+            </button>
+            <button class="btn-primary" id="btnNewCreditCard">
+              <i class="ph-bold ph-plus"></i> Novo Cartão
+            </button>
+          </div>
+        </div>
+
+        <!-- Grid de Cartões -->
+        <div class="credit-cards-grid" id="creditCardsGrid">
+          <!-- Renderizado dinamicamente -->
+        </div>
+
+        <!-- Dica de Finanças -->
+        <div class="info-tip-box">
+          <i class="ph-bold ph-lightbulb"></i>
+          <div>
+            <strong>Dica Estratégica:</strong>
+            <p>O valor total das faturas do mês selecionado é descontado do cálculo do seu Patrimônio Líquido imediato e somado às despesas mensais para que o fluxo de caixa reflita a realidade.</p>
+          </div>
+        </div>
+
+        <!-- Tabela Mês a Mês de Faturas -->
+        <div class="table-container" style="margin-top: 24px;">
+          <div class="table-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+            <div>
+              <h3><i class="ph ph-calendar"></i> Histórico & Lançamento de Faturas Mês a Mês</h3>
+              <span class="table-sub">Acompanhe e lance o valor de cada cartão mês a mês para somar com suas despesas.</span>
+            </div>
+            <button class="btn-secondary btn-sm" onclick="app.openCreditCardModal()">
+              <i class="ph ph-pencil-simple"></i> Lançar por Mês
+            </button>
+          </div>
+          <div class="table-responsive">
+            <table class="data-table" id="monthlyInvoicesTable">
+              <!-- Renderizado via JS -->
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- SEÇÃO 4: RECEITAS & CONSULTORIAS -->
+      <section id="section-receitas" class="content-section">
+        <div class="section-header-banner">
+          <div>
+            <h2>Rendas Mensais & Consultorias</h2>
+            <p>Gerencie o salário mensal e registre as receitas extras que entram com consultorias.</p>
+          </div>
+          <div class="btn-group">
+            <button class="btn-secondary" id="btnEditSalaries">
+              <i class="ph ph-wallet"></i> Salário Fixo
+            </button>
+            <button class="btn-primary" id="btnNewConsultancy">
+              <i class="ph-bold ph-plus"></i> Nova Consultoria
+            </button>
+          </div>
+        </div>
+
+        <!-- Cards de Salários Fixos -->
+        <div class="salary-overview-grid">
+
+          <div class="salary-card">
+            <div class="salary-header">
+              <div class="user-avatar andressa">A</div>
+              <div>
+                <h4>Salário Andressa</h4>
+                <span class="badge badge-subtle">Renda Fixa</span>
+              </div>
+            </div>
+            <div class="salary-amount" id="salaryAndressaDisplay">R$ 0,00</div>
+          </div>
+
+          <div class="salary-card highlight-income">
+            <div class="salary-header">
+              <div class="user-avatar consultoria"><i class="ph-bold ph-briefcase"></i></div>
+              <div>
+                <h4>Consultorias no Mês</h4>
+                <span class="badge badge-green" id="consultanciesCountBadge">0 projetos</span>
+              </div>
+            </div>
+            <div class="salary-amount text-success" id="consultancyTotalDisplay">R$ 0,00</div>
+          </div>
+        </div>
+
+        <!-- Tabela de Consultorias -->
+        <div class="table-container">
+          <div class="table-header">
+            <h3>Entradas de Consultoria</h3>
+            <span class="table-sub">Registros de trabalhos avulsos e clientes</span>
+          </div>
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Cliente / Projeto</th>
+                  <th>Responsável</th>
+                  <th>Data Prevista/Recebida</th>
+                  <th>Valor</th>
+                  <th>Status</th>
+                  <th class="text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="consultancyTableBody">
+                <!-- Linhas preenchidas via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- SEÇÃO 5: DESPESAS FIXAS & VARIÁVEIS -->
+      <section id="section-despesas" class="content-section">
+        <div class="section-header-banner">
+          <div>
+            <h2>Contas Fixas & Despesas Variáveis</h2>
+            <p>Controle todos os compromissos do mês, acompanhando o que já foi pago e o que ainda está pendente.</p>
+          </div>
+          <button class="btn-primary" id="btnNewExpense">
+            <i class="ph-bold ph-plus"></i> Nova Despesa
+          </button>
+        </div>
+
+        <!-- Resumo Consolidado de Despesas (Contas + Faturas) -->
+        <div class="expenses-consolidated-grid" id="expensesConsolidatedGrid">
+          <!-- Renderizado via JS -->
+        </div>
+
+        <!-- Filtros Rápidos -->
+        <div class="filters-row">
+          <div class="filter-pills">
+            <button class="filter-pill active" data-filter="all">Todas as Despesas</button>
+            <button class="filter-pill" data-filter="fixa">Contas Fixas</button>
+            <button class="filter-pill" data-filter="variavel">Despesas Variáveis</button>
+            <button class="filter-pill" data-filter="cartao">Faturas de Cartões</button>
+            <button class="filter-pill" data-filter="pendente">Apenas Pendentes</button>
+            <button class="filter-pill" data-filter="pago">Pagas</button>
+          </div>
+          <div class="expenses-summary-pill">
+            <span>Total Filtrado: <strong id="expensesFilteredTotal">R$ 0,00</strong></span>
+          </div>
+        </div>
+
+        <!-- Tabela de Despesas -->
+        <div class="table-container">
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Descrição</th>
+                  <th>Tipo</th>
+                  <th>Categoria</th>
+                  <th>Vencimento</th>
+                  <th>Valor</th>
+                  <th>Status</th>
+                  <th class="text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="expensesTableBody">
+                <!-- Preenchido via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- SEÇÃO 6: META DE POUPANÇA & INVESTIMENTOS -->
+      <section id="section-poupanca" class="content-section">
+        <div class="section-header-banner">
+          <div>
+            <h2>Plano de Poupança & Reserva</h2>
+            <p>Defina o quanto vocês querem economizar todo mês e acompanhe o crescimento do patrimônio.</p>
+          </div>
+          <button class="btn-primary" id="btnConfigPoupanca">
+            <i class="ph-bold ph-gear"></i> Configurar Meta
+          </button>
+        </div>
+
+        <div class="poupanca-cards-grid">
+          <div class="poupanca-stat-card">
+            <span class="label">Meta Mensal Estabelecida</span>
+            <div class="val" id="poupancaMetaValor">R$ 1.500,00</div>
+            <span class="sub" id="poupancaMetaPercentSalario">Aprox. 20% da renda fixa</span>
+          </div>
+
+          <div class="poupanca-stat-card">
+            <span class="label">Disponível para Poupar no Mês</span>
+            <div class="val text-success" id="poupancaDisponivelMes">R$ 0,00</div>
+            <span class="sub">Após pagar todas as despesas e faturas</span>
+          </div>
+
+          <div class="poupanca-stat-card">
+            <span class="label">Total em Investimentos (Rico)</span>
+            <div class="val text-accent-orange" id="poupancaRicoValor">R$ 0,00</div>
+            <span class="sub">Patrimônio aplicado rendendo</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Rodapé / Créditos -->
+      <footer class="app-footer">
+        <p>Sistema de Controle Financeiro Familiar • Vitor & Andressa • Todos os dados salvos com privacidade localmente.</p>
+        <button id="btnResetDemoData" class="btn-text-danger">Carregar Dados Iniciais de Exemplo</button>
+      </footer>
+    </main>
+  </div>
+
+  <!-- MODAL GENÉRICO DE FORMULÁRIO -->
+  <div class="modal-overlay" id="mainModal">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 id="modalTitle">Título do Modal</h3>
+        <button class="modal-close" id="modalCloseBtn"><i class="ph ph-x"></i></button>
+      </div>
+      <div class="modal-body" id="modalBody">
+        <!-- Conteúdo injetado dinamicamente -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Notificações Toast -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- JavaScript Principal -->
+  <script src="js/app.js"></script>
+</body>
+</html>
