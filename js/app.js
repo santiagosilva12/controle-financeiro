@@ -237,6 +237,7 @@ const defaultData = {
 const app = {
   data: null,
   activeFilter: 'all',
+  incomeFilter: 'all',
   currentDate: new Date(2026, 9, 1), // Outubro 2026
   cashflowChartInstance: null,
   distributionChartInstance: null,
@@ -412,6 +413,10 @@ const app = {
     }
     document.getElementById('btnEditSalaries').addEventListener('click', () => this.openSalariesModal());
     document.getElementById('btnNewConsultancy').addEventListener('click', () => this.openConsultancyModal());
+    const btnNewReembolso = document.getElementById('btnNewReembolso');
+    if (btnNewReembolso) {
+      btnNewReembolso.addEventListener('click', () => this.openReembolsoModal());
+    }
     document.getElementById('btnNewExpense').addEventListener('click', () => this.openExpenseModal());
     document.getElementById('btnEditarMeta').addEventListener('click', () => this.openSavingsGoalModal());
     document.getElementById('btnConfigPoupanca').addEventListener('click', () => this.openSavingsGoalModal());
@@ -630,9 +635,17 @@ const app = {
         salariosRecebidosTotal: 0,
         salariosPendentesTotal: 0,
         consultoriasDoMes: [],
+        apenasConsultorias: [],
+        apenasReembolsos: [],
         consultoriasRecebidas: 0,
         consultoriasPendentes: 0,
         consultoriasTotal: 0,
+        reembolsosRecebidos: 0,
+        reembolsosPendentes: 0,
+        reembolsosTotal: 0,
+        extrasTotal: 0,
+        extrasRecebidosTotal: 0,
+        extrasPendentesTotal: 0,
         totalGeralMes: 0,
         totalRecebidoMes: 0,
         totalPendenteMes: 0,
@@ -672,20 +685,37 @@ const app = {
     const salariosRecebidosTotal = salarioDia15Recebido + salarioDia30Recebido;
     const salariosPendentesTotal = salariosTotal - salariosRecebidosTotal;
 
-    // Consultorias (PUXAR APENAS AS DO MÊS ESPECIFICADO)
+    // Entradas Extras do Mês: Consultorias & Reembolsos (PUXAR APENAS AS DO MÊS ESPECIFICADO)
     const consultoriasDoMes = this.data.consultancies.filter(c => c.date && c.date.startsWith(monthKey));
-    const consultoriasRecebidas = consultoriasDoMes
+
+    // Separar por tipo (retrocompatibilidade: se não tiver type, assume consultoria)
+    const apenasConsultorias = consultoriasDoMes.filter(c => (c.type || 'consultoria') === 'consultoria');
+    const apenasReembolsos = consultoriasDoMes.filter(c => c.type === 'reembolso');
+
+    const consultoriasRecebidas = apenasConsultorias
       .filter(c => c.status === 'recebido')
       .reduce((acc, c) => acc + (Number(c.amount) || 0), 0);
-    const consultoriasPendentes = consultoriasDoMes
+    const consultoriasPendentes = apenasConsultorias
       .filter(c => c.status === 'pendente')
       .reduce((acc, c) => acc + (Number(c.amount) || 0), 0);
     const consultoriasTotal = consultoriasRecebidas + consultoriasPendentes;
 
+    const reembolsosRecebidos = apenasReembolsos
+      .filter(c => c.status === 'recebido')
+      .reduce((acc, c) => acc + (Number(c.amount) || 0), 0);
+    const reembolsosPendentes = apenasReembolsos
+      .filter(c => c.status === 'pendente')
+      .reduce((acc, c) => acc + (Number(c.amount) || 0), 0);
+    const reembolsosTotal = reembolsosRecebidos + reembolsosPendentes;
+
+    const extrasTotal = consultoriasTotal + reembolsosTotal;
+    const extrasRecebidosTotal = consultoriasRecebidas + reembolsosRecebidos;
+    const extrasPendentesTotal = consultoriasPendentes + reembolsosPendentes;
+
     // TOTAIS CONSOLIDADOS DE ENTRADAS / RECEITAS DO MÊS
-    const totalGeralMes = salariosTotal + consultoriasTotal;
-    const totalRecebidoMes = salariosRecebidosTotal + consultoriasRecebidas;
-    const totalPendenteMes = salariosPendentesTotal + consultoriasPendentes;
+    const totalGeralMes = salariosTotal + extrasTotal;
+    const totalRecebidoMes = salariosRecebidosTotal + extrasRecebidosTotal;
+    const totalPendenteMes = salariosPendentesTotal + extrasPendentesTotal;
 
     const totalEntradas = totalRecebidoMes;
     const totalEntradasPrevistas = totalGeralMes;
@@ -733,9 +763,17 @@ const app = {
       salariosRecebidosTotal,
       salariosPendentesTotal,
       consultoriasDoMes,
+      apenasConsultorias,
+      apenasReembolsos,
       consultoriasRecebidas,
       consultoriasPendentes,
       consultoriasTotal,
+      reembolsosRecebidos,
+      reembolsosPendentes,
+      reembolsosTotal,
+      extrasTotal,
+      extrasRecebidosTotal,
+      extrasPendentesTotal,
       totalGeralMes,
       totalRecebidoMes,
       totalPendenteMes,
@@ -1242,8 +1280,20 @@ const app = {
       consultBreakdownEl.innerHTML = `Recebido: <strong class="text-success">${formatMoney(t.consultoriasRecebidas)}</strong> • Pendente: <strong class="text-gold">${formatMoney(t.consultoriasPendentes)}</strong>`;
     }
 
-    document.getElementById('consultancyTotalDisplay').textContent = formatMoney(t.consultoriasTotal);
-    document.getElementById('consultanciesCountBadge').textContent = `${t.consultoriasDoMes.length} no mês`;
+    const consultTotalDisplay = document.getElementById('consultancyTotalDisplay');
+    if (consultTotalDisplay) consultTotalDisplay.textContent = formatMoney(t.consultoriasTotal);
+    const consultCountBadge = document.getElementById('consultanciesCountBadge');
+    if (consultCountBadge) consultCountBadge.textContent = `${t.apenasConsultorias.length} no mês`;
+
+    // Reembolsos no Mês
+    const reembolsoBreakdownEl = document.getElementById('reembolsoReceivedBreakdown');
+    if (reembolsoBreakdownEl) {
+      reembolsoBreakdownEl.innerHTML = `Recebido: <strong class="text-success">${formatMoney(t.reembolsosRecebidos)}</strong> • Pendente: <strong class="text-gold">${formatMoney(t.reembolsosPendentes)}</strong>`;
+    }
+    const reembolsoTotalDisplay = document.getElementById('reembolsoTotalDisplay');
+    if (reembolsoTotalDisplay) reembolsoTotalDisplay.textContent = formatMoney(t.reembolsosTotal);
+    const reembolsosCountBadge = document.getElementById('reembolsosCountBadge');
+    if (reembolsosCountBadge) reembolsosCountBadge.textContent = `${t.apenasReembolsos.length} no mês`;
 
     // 4. Resumo Consolidado de Rendas do Mês (Total Geral & Já Recebido)
     const incTotalGeralEl = document.getElementById('incomeTotalGeralMes');
@@ -1251,7 +1301,11 @@ const app = {
 
     const incTotalGeralSub = document.getElementById('incomeTotalGeralSub');
     if (incTotalGeralSub) {
-      incTotalGeralSub.textContent = `Salários (${formatMoney(t.salariosTotal)}) + Consultorias (${formatMoney(t.consultoriasTotal)})`;
+      const parts = [`Salários (${formatMoney(t.salariosTotal)})`];
+      if (t.consultoriasTotal > 0) parts.push(`Consultorias (${formatMoney(t.consultoriasTotal)})`);
+      if (t.reembolsosTotal > 0) parts.push(`Reembolsos (${formatMoney(t.reembolsosTotal)})`);
+      if (t.consultoriasTotal === 0 && t.reembolsosTotal === 0) parts.push('Nenhuma renda extra');
+      incTotalGeralSub.textContent = parts.join(' + ');
     }
 
     const incTotalRecebidoEl = document.getElementById('incomeTotalRecebidoMes');
@@ -1273,49 +1327,82 @@ const app = {
 
     const subEl = document.getElementById('consultancyPeriodSub');
     if (subEl) {
-      subEl.textContent = `Registros de consultorias previstos ou recebidos em ${monthName} / ${year}`;
+      subEl.textContent = `Registros de consultorias e reembolsos previstos ou recebidos em ${monthName} / ${year}`;
     }
 
-    // Tabela de consultorias (SOMENTE AS DO MÊS SELECIONADO)
+    // Filtrar itens da tabela pelo filtro ativo (all, consultoria, reembolso)
+    const filter = this.incomeFilter || 'all';
+    let filteredList = t.consultoriasDoMes;
+    if (filter === 'consultoria') {
+      filteredList = t.apenasConsultorias;
+    } else if (filter === 'reembolso') {
+      filteredList = t.apenasReembolsos;
+    }
+
+    // Tabela de consultorias e reembolsos
     const tbody = document.getElementById('consultancyTableBody');
-    if (t.consultoriasDoMes.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding: 24px; color: var(--text-muted);"><i class="ph ph-calendar-blank" style="font-size:22px; display:block; margin-bottom:6px;"></i>Nenhuma consultoria lançada para ${monthName} / ${year}. Clique em "Nova Consultoria" para lançar neste mês.</td></tr>`;
+    if (filteredList.length === 0) {
+      const msg = filter === 'reembolso'
+        ? `Nenhum reembolso lançado para ${monthName} / ${year}. Clique em "+ Novo Reembolso" para lançar.`
+        : (filter === 'consultoria'
+          ? `Nenhuma consultoria lançada para ${monthName} / ${year}. Clique em "+ Nova Consultoria" para lançar.`
+          : `Nenhuma consultoria ou reembolso lançado para ${monthName} / ${year}.`);
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding: 24px; color: var(--text-muted);"><i class="ph ph-calendar-blank" style="font-size:22px; display:block; margin-bottom:6px;"></i>${msg}</td></tr>`;
       return;
     }
 
-    tbody.innerHTML = t.consultoriasDoMes.map(c => `
-      <tr>
-        <td>
-          <strong>${c.client}</strong>
-          ${c.description ? `<br><small style="color:var(--text-muted);">${c.description}</small>` : ''}
-        </td>
-        <td>
-          <span class="badge ${c.person === 'Vitor' ? 'badge-blue' : 'badge-subtle'}">
-            ${c.person}
-          </span>
-        </td>
-        <td>${formatDate(c.date)}</td>
-        <td><strong class="text-success">${formatMoney(c.amount)}</strong></td>
-        <td>
-          <button class="badge ${c.status === 'recebido' ? 'badge-green' : 'badge-gold'}" 
-                  style="border:none; cursor:pointer;" 
-                  onclick="app.toggleConsultancyStatus('${c.id}')"
-                  title="Clique para alternar Recebido / Pendente">
-            ${c.status === 'recebido' ? '✓ Recebido' : '⏳ Pendente'}
-          </button>
-        </td>
-        <td class="text-right">
-          <div class="table-actions">
-            <button class="btn-table-icon" onclick="app.editConsultancy('${c.id}')" title="Editar">
-              <i class="ph ph-pencil-simple"></i>
+    tbody.innerHTML = filteredList.map(c => {
+      const isReemb = (c.type === 'reembolso');
+      const typeBadge = isReemb
+        ? '<span class="badge badge-purple" style="display:inline-flex; align-items:center; gap:4px;"><i class="ph-bold ph-arrow-u-up-left"></i> Reembolso</span>'
+        : '<span class="badge badge-green" style="display:inline-flex; align-items:center; gap:4px;"><i class="ph-bold ph-briefcase"></i> Consultoria</span>';
+
+      return `
+        <tr>
+          <td>
+            <strong>${c.client}</strong>
+            ${c.description ? `<br><small style="color:var(--text-muted);">${c.description}</small>` : ''}
+          </td>
+          <td>${typeBadge}</td>
+          <td>
+            <span class="badge ${c.person === 'Vitor' ? 'badge-blue' : 'badge-subtle'}">
+              ${c.person}
+            </span>
+          </td>
+          <td>${formatDate(c.date)}</td>
+          <td><strong class="${isReemb ? 'text-purple' : 'text-success'}">${formatMoney(c.amount)}</strong></td>
+          <td>
+            <button class="badge ${c.status === 'recebido' ? 'badge-green' : 'badge-gold'}" 
+                    style="border:none; cursor:pointer;" 
+                    onclick="app.toggleConsultancyStatus('${c.id}')"
+                    title="Clique para alternar Recebido / Pendente">
+              ${c.status === 'recebido' ? '✓ Recebido' : '⏳ Pendente'}
             </button>
-            <button class="btn-table-icon delete" onclick="app.deleteConsultancy('${c.id}')" title="Excluir">
-              <i class="ph ph-trash"></i>
-            </button>
-          </div>
-        </td>
-      </tr>
-    `).join('');
+          </td>
+          <td class="text-right">
+            <div class="table-actions">
+              <button class="btn-table-icon" onclick="app.editConsultancy('${c.id}')" title="Editar">
+                <i class="ph ph-pencil-simple"></i>
+              </button>
+              <button class="btn-table-icon delete" onclick="app.deleteConsultancy('${c.id}')" title="Excluir">
+                <i class="ph ph-trash"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  },
+
+  setIncomeFilter(filter) {
+    this.incomeFilter = filter;
+    const btnAll = document.getElementById('filterExtraAll');
+    const btnCons = document.getElementById('filterExtraConsultancy');
+    const btnReemb = document.getElementById('filterExtraReembolso');
+    if (btnAll) btnAll.classList.toggle('active', filter === 'all');
+    if (btnCons) btnCons.classList.toggle('active', filter === 'consultoria');
+    if (btnReemb) btnReemb.classList.toggle('active', filter === 'reembolso');
+    this.renderIncomeSection();
   },
 
   toggleConsultancyStatus(id) {
@@ -1324,16 +1411,21 @@ const app = {
       c.status = c.status === 'recebido' ? 'pendente' : 'recebido';
       this.saveData();
       this.renderAll();
-      this.showToast(`Status da consultoria atualizado para ${c.status.toUpperCase()}`);
+      const label = c.type === 'reembolso' ? 'Reembolso' : 'Consultoria';
+      this.showToast(c.status === 'recebido' 
+        ? `${label} "${c.client}" marcado como RECEBIDO!` 
+        : `${label} "${c.client}" marcado como PENDENTE.`);
     }
   },
 
   deleteConsultancy(id) {
-    if (confirm('Deseja realmente remover esta consultoria?')) {
-      this.data.consultancies = this.data.consultancies.filter(c => c.id !== id);
+    const c = this.data.consultancies.find(item => item.id === id);
+    const label = c && c.type === 'reembolso' ? 'este reembolso' : 'esta consultoria';
+    if (confirm(`Deseja realmente remover ${label}?`)) {
+      this.data.consultancies = this.data.consultancies.filter(item => item.id !== id);
       this.saveData();
       this.renderAll();
-      this.showToast('Consultoria removida com sucesso!');
+      this.showToast('Item removido com sucesso!');
     }
   },
 
@@ -1901,6 +1993,14 @@ const app = {
           </div>
         </button>
 
+        <button class="btn-secondary" style="justify-content:flex-start; padding:14px;" onclick="app.openReembolsoModal()">
+          <i class="ph-bold ph-arrow-u-up-left text-purple" style="font-size:22px;"></i>
+          <div style="text-align:left;">
+            <strong>Novo Reembolso a Receber</strong>
+            <div style="font-size:0.75rem; color:var(--text-muted);">Reembolso corporativo, saúde ou despesa de trabalho</div>
+          </div>
+        </button>
+
         <button class="btn-secondary" style="justify-content:flex-start; padding:14px;" onclick="app.openCreditCardModal()">
           <i class="ph-bold ph-credit-card text-danger" style="font-size:22px;"></i>
           <div style="text-align:left;">
@@ -1955,7 +2055,14 @@ const app = {
           </div>
           <div class="form-group">
             <label class="form-label">Categoria</label>
-            <input type="text" id="expCategory" class="form-control" value="${exp.category}" placeholder="Ex: Moradia, Alimentação, Saúde">
+            <input type="text" id="expCategory" class="form-control" value="${exp.category}" placeholder="Ex: Moradia, Alimentação, Saúde, Reembolsável">
+            <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:6px;">
+              <span class="badge badge-subtle" style="cursor:pointer;" onclick="document.getElementById('expCategory').value = 'Moradia'">Moradia</span>
+              <span class="badge badge-subtle" style="cursor:pointer;" onclick="document.getElementById('expCategory').value = 'Alimentação'">Alimentação</span>
+              <span class="badge badge-subtle" style="cursor:pointer;" onclick="document.getElementById('expCategory').value = 'Saúde'">Saúde</span>
+              <span class="badge badge-subtle" style="cursor:pointer;" onclick="document.getElementById('expCategory').value = 'Transporte'">Transporte</span>
+              <span class="badge badge-purple" style="cursor:pointer;" onclick="document.getElementById('expCategory').value = 'Reembolsável (Empresa)'"><i class="ph-bold ph-arrow-u-up-left"></i> Reembolsável</span>
+            </div>
           </div>
         </div>
 
@@ -2041,11 +2148,12 @@ const app = {
     this.openExpenseModal(id);
   },
 
-  // Modal Consultoria
-  openConsultancyModal(editingId = null) {
+  // Modal Consultoria & Reembolso
+  openConsultancyModal(editingId = null, initialType = 'consultoria') {
     const monthKey = this.getCurrentMonthKey();
     const defaultDate = `${monthKey}-15`;
     const item = editingId ? this.data.consultancies.find(c => c.id === editingId) : {
+      type: initialType,
       client: '',
       person: 'Andressa',
       description: '',
@@ -2055,57 +2163,89 @@ const app = {
     };
 
     const isEdit = !!editingId;
+    const currentType = item.type || initialType || 'consultoria';
+    const isReembolso = currentType === 'reembolso';
+
     const html = `
       <form id="formConsultancy" onsubmit="event.preventDefault(); app.saveConsultancy('${editingId || ''}');">
-        <div class="form-group">
-          <label class="form-label">Cliente ou Empresa</label>
-          <input type="text" id="consClient" class="form-control" required value="${item.client}" placeholder="Ex: Projeto ABC, Empresa XYZ">
-        </div>
-
         <div class="form-row">
           <div class="form-group">
-            <label class="form-label">Quem executou?</label>
+            <label class="form-label">Tipo de Lançamento</label>
+            <select id="consType" class="form-control" onchange="app.updateIncomeModalLabels(this.value)">
+              <option value="consultoria" ${currentType === 'consultoria' ? 'selected' : ''}>Consultoria (Serviço / Projeto Extra)</option>
+              <option value="reembolso" ${currentType === 'reembolso' ? 'selected' : ''}>Reembolso (Empresa / Saúde / Corporativo)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Quem executou / Titular</label>
             <select id="consPerson" class="form-control">
-              <option value="Vitor" ${item.person === 'Vitor' ? 'selected' : ''}>Vitor</option>
               <option value="Andressa" ${item.person === 'Andressa' ? 'selected' : ''}>Andressa</option>
+              <option value="Vitor" ${item.person === 'Vitor' ? 'selected' : ''}>Vitor</option>
               <option value="Casal" ${item.person === 'Casal' ? 'selected' : ''}>Casal (Conjunto)</option>
             </select>
           </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" id="labelConsClient">${isReembolso ? 'Empresa / Origem do Reembolso' : 'Cliente ou Empresa'}</label>
+          <input type="text" id="consClient" class="form-control" required value="${item.client}" placeholder="${isReembolso ? 'Ex: Empresa X, Bradesco Saúde, Viagem corporativa' : 'Ex: Projeto ABC, Empresa XYZ'}">
+        </div>
+
+        <div class="form-row">
           <div class="form-group">
             <label class="form-label">Valor (R$)</label>
             <input type="number" step="0.01" id="consAmount" class="form-control" required value="${item.amount}" placeholder="0,00">
           </div>
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">Descrição do Trabalho / Escopo</label>
-          <input type="text" id="consDesc" class="form-control" value="${item.description}" placeholder="Ex: Mentoria, criação de relatório, assessoria técnica">
-        </div>
-
-        <div class="form-row">
           <div class="form-group">
             <label class="form-label">Data Prevista ou Recebida</label>
             <input type="date" id="consDate" class="form-control" value="${item.date}">
           </div>
-          <div class="form-group">
-            <label class="form-label">Status do Pagamento</label>
-            <select id="consStatus" class="form-control">
-              <option value="recebido" ${item.status === 'recebido' ? 'selected' : ''}>Já Recebido (Entrou na Conta)</option>
-              <option value="pendente" ${item.status === 'pendente' ? 'selected' : ''}>A Receber (Previsto)</option>
-            </select>
-          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" id="labelConsDesc">${isReembolso ? 'Motivo do Reembolso / Despesas Reembolsadas' : 'Descrição do Trabalho / Escopo'}</label>
+          <input type="text" id="consDesc" class="form-control" value="${item.description}" placeholder="${isReembolso ? 'Ex: Passagem e hotel em SP, consulta médica, materiais' : 'Ex: Mentoria, criação de relatório, assessoria técnica'}">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Status do Pagamento</label>
+          <select id="consStatus" class="form-control">
+            <option value="recebido" ${item.status === 'recebido' ? 'selected' : ''}>Já Recebido (Creditado na Conta)</option>
+            <option value="pendente" ${item.status === 'pendente' ? 'selected' : ''}>A Receber (Aguardando Reembolso/Depósito)</option>
+          </select>
         </div>
 
         <div class="form-footer">
           <button type="button" class="btn-secondary" onclick="app.closeModal()">Cancelar</button>
-          <button type="submit" class="btn-primary">${isEdit ? 'Atualizar Consultoria' : 'Registrar Entrada'}</button>
+          <button type="submit" class="btn-primary">${isEdit ? 'Atualizar Registro' : (isReembolso ? 'Registrar Reembolso' : 'Registrar Consultoria')}</button>
         </div>
       </form>
     `;
-    this.openModal(isEdit ? 'Editar Consultoria' : 'Nova Consultoria (Renda Extra)', html);
+    const title = isEdit 
+      ? (isReembolso ? 'Editar Reembolso' : 'Editar Consultoria') 
+      : (isReembolso ? 'Novo Reembolso a Receber' : 'Nova Consultoria (Renda Extra)');
+    this.openModal(title, html);
+  },
+
+  openReembolsoModal(editingId = null) {
+    this.openConsultancyModal(editingId, 'reembolso');
+  },
+
+  updateIncomeModalLabels(type) {
+    const isReembolso = type === 'reembolso';
+    const labelClient = document.getElementById('labelConsClient');
+    const inputClient = document.getElementById('consClient');
+    const labelDesc = document.getElementById('labelConsDesc');
+    const inputDesc = document.getElementById('consDesc');
+
+    if (labelClient) labelClient.textContent = isReembolso ? 'Empresa / Origem do Reembolso' : 'Cliente ou Empresa';
+    if (inputClient) inputClient.placeholder = isReembolso ? 'Ex: Empresa X, Bradesco Saúde, Viagem corporativa' : 'Ex: Projeto ABC, Empresa XYZ';
+    if (labelDesc) labelDesc.textContent = isReembolso ? 'Motivo do Reembolso / Despesas Reembolsadas' : 'Descrição do Trabalho / Escopo';
+    if (inputDesc) inputDesc.placeholder = isReembolso ? 'Ex: Passagem e hotel em SP, consulta médica, materiais' : 'Ex: Mentoria, criação de relatório, assessoria técnica';
   },
 
   saveConsultancy(editingId) {
+    const type = document.getElementById('consType') ? document.getElementById('consType').value : 'consultoria';
     const client = document.getElementById('consClient').value.trim();
     const person = document.getElementById('consPerson').value;
     const amount = parseFloat(document.getElementById('consAmount').value) || 0;
@@ -2114,18 +2254,19 @@ const app = {
     const status = document.getElementById('consStatus').value;
 
     if (!client || amount <= 0) {
-      alert('Preencha o cliente e o valor da consultoria.');
+      alert('Preencha a origem/cliente e o valor.');
       return;
     }
 
     if (editingId) {
       const idx = this.data.consultancies.findIndex(c => c.id === editingId);
       if (idx !== -1) {
-        this.data.consultancies[idx] = { ...this.data.consultancies[idx], client, person, amount, description, date, status };
+        this.data.consultancies[idx] = { ...this.data.consultancies[idx], type, client, person, amount, description, date, status };
       }
     } else {
       this.data.consultancies.unshift({
         id: 'c_' + Date.now(),
+        type,
         client,
         person,
         description,
@@ -2138,11 +2279,13 @@ const app = {
     this.saveData();
     this.closeModal();
     this.renderAll();
-    this.showToast('Consultoria registrada com sucesso!');
+    this.showToast(type === 'reembolso' ? 'Reembolso registrado com sucesso!' : 'Consultoria registrada com sucesso!');
   },
 
   editConsultancy(id) {
-    this.openConsultancyModal(id);
+    const item = this.data.consultancies.find(c => c.id === id);
+    const initialType = item ? (item.type || 'consultoria') : 'consultoria';
+    this.openConsultancyModal(id, initialType);
   },
 
   // Modal de Atualização de Saldos das Contas

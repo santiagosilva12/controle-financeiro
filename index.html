@@ -378,15 +378,18 @@
       <section id="section-receitas" class="content-section">
         <div class="section-header-banner">
           <div>
-            <h2>Rendas Mensais & Consultorias</h2>
-            <p>Gerencie o salário mensal e registre as receitas extras que entram com consultorias.</p>
+            <h2>Rendas Mensais, Consultorias & Reembolsos</h2>
+            <p>Gerencie o salário mensal, registre consultorias e acompanhe reembolsos da empresa a receber.</p>
           </div>
           <div class="btn-group">
             <button class="btn-secondary" id="btnEditSalaries">
               <i class="ph ph-wallet"></i> Salário Fixo
             </button>
+            <button class="btn-secondary" id="btnNewReembolso" onclick="app.openReembolsoModal()" style="border-color: rgba(168, 85, 247, 0.4); color: #C084FC;">
+              <i class="ph-bold ph-arrow-u-up-left"></i> + Novo Reembolso
+            </button>
             <button class="btn-primary" id="btnNewConsultancy">
-              <i class="ph-bold ph-plus"></i> Nova Consultoria
+              <i class="ph-bold ph-plus"></i> + Nova Consultoria
             </button>
           </div>
         </div>
@@ -457,6 +460,21 @@
               Recebido: R$ 0,00 • Pendente: R$ 0,00
             </small>
           </div>
+
+          <!-- Reembolsos no Mês Selecionado -->
+          <div class="salary-card">
+            <div class="salary-header">
+              <div class="user-avatar reembolso"><i class="ph-bold ph-arrow-u-up-left"></i></div>
+              <div>
+                <h4>Reembolsos no Mês</h4>
+                <span class="badge badge-purple" id="reembolsosCountBadge">0 no mês</span>
+              </div>
+            </div>
+            <div class="salary-amount text-purple" id="reembolsoTotalDisplay">R$ 0,00</div>
+            <small style="color:var(--text-muted); font-size:0.75rem; display:block; margin-top:4px;" id="reembolsoReceivedBreakdown">
+              Recebido: R$ 0,00 • Pendente: R$ 0,00
+            </small>
+          </div>
         </div>
 
         <!-- Resumo Consolidado de Rendas do Mês: Total Geral & Já Recebido -->
@@ -464,7 +482,7 @@
           <div class="inc-summary-card highlight-total">
             <span class="label"><i class="ph-bold ph-calendar-star"></i> TOTAL GERAL DO MÊS</span>
             <div class="value" id="incomeTotalGeralMes">R$ 0,00</div>
-            <span class="sub" id="incomeTotalGeralSub">Salários + Consultorias Previstas</span>
+            <span class="sub" id="incomeTotalGeralSub">Salários + Consultorias + Reembolsos</span>
           </div>
 
           <div class="inc-summary-card highlight-received">
@@ -480,17 +498,25 @@
           </div>
         </div>
 
-        <!-- Tabela de Consultorias -->
+        <!-- Tabela de Consultorias & Reembolsos -->
         <div class="table-container">
-          <div class="table-header">
-            <h3>Entradas de Consultoria</h3>
-            <span class="table-sub" id="consultancyPeriodSub">Registros de trabalhos avulsos e clientes previstos ou recebidos no mês selecionado</span>
+          <div class="table-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+            <div>
+              <h3>Entradas Extras: Consultorias & Reembolsos</h3>
+              <span class="table-sub" id="consultancyPeriodSub">Registros de trabalhos avulsos e reembolsos corporativos previstos ou recebidos</span>
+            </div>
+            <div class="btn-group">
+              <button class="filter-pill active" id="filterExtraAll" onclick="app.setIncomeFilter('all')">Todos</button>
+              <button class="filter-pill" id="filterExtraConsultancy" onclick="app.setIncomeFilter('consultoria')">Consultorias</button>
+              <button class="filter-pill" id="filterExtraReembolso" onclick="app.setIncomeFilter('reembolso')">Reembolsos</button>
+            </div>
           </div>
           <div class="table-responsive">
             <table class="data-table">
               <thead>
                 <tr>
-                  <th>Cliente / Projeto</th>
+                  <th>Origem / Cliente / Empresa</th>
+                  <th>Tipo</th>
                   <th>Responsável</th>
                   <th>Data Prevista/Recebida</th>
                   <th>Valor</th>
