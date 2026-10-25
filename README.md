@@ -54,7 +54,13 @@ Um painel completo, moderno e intuitivo desenvolvido sob medida para o controle 
 - **Fluxo de Caixa:** Comparativo entre Entradas Totais vs Despesas & Faturas vs Sobra Líquida.
 - **Distribuição Patrimonial:** Gráfico de rosca mostrando a proporção do dinheiro entre cada banco e o FGTS.
 
-### 8. 💾 Backup & Segurança
+### 8. ☁️ Banco de Dados em Nuvem (Neon PostgreSQL)
+- **Projeto no Neon:** `controle-financeiro` hospedado na região **AWS São Paulo (`aws-sa-east-1`)**.
+- **Sincronização Bidirecional Automática:** Ao abrir a aplicação ou salvar qualquer alteração, os dados sincronizam automaticamente com a nuvem via API Serverless HTTP do Neon.
+- **Funcionamento Híbrido:** Continua funcionando offline via `localStorage` e sincroniza assim que conectado à internet.
+- **Indicador em Tempo Real:** Status visual na barra lateral e no topo informando o estado da conexão (*Nuvem Ativa*, *Sincronizando...* ou *Offline*).
+
+### 9. 💾 Backup & Segurança
 - Botão **Backup**: Baixa um arquivo `.json` com todos os seus lançamentos e saldos.
 - Botão **Restaurar**: Permite importar seu backup em qualquer outro computador ou celular.
 - Botão **Alternar Modo Claro / Modo Escuro** na barra lateral.

@@ -7,6 +7,16 @@
 // Chaves de armazenamento local
 const STORAGE_KEY = 'VA_FINANCAS_V1';
 const THEME_KEY = 'VA_FINANCAS_THEME';
+const NEON_CONFIG_KEY = 'VA_NEON_CONFIG_V1';
+
+// Configuração padrão da nuvem Neon (AWS São Paulo)
+const DEFAULT_NEON_CONFIG = {
+  enabled: true,
+  endpoint: 'https://ep-dry-glitter-b6oe872n-pooler.c-2.sa-east-1.aws.neon.tech/sql',
+  connectionString: 'postgresql://neondb_owner:npg_3zLyACZHBph8@ep-dry-glitter-b6oe872n-pooler.c-2.sa-east-1.aws.neon.tech/neondb?sslmode=require',
+  projectName: 'controle-financeiro',
+  region: 'São Paulo (aws-sa-east-1)'
+};
 
 // Formatação monetária BRL
 const formatMoney = (val) => {
@@ -228,10 +238,14 @@ const app = {
   currentDate: new Date(2026, 9, 1), // Outubro 2026
   cashflowChartInstance: null,
   distributionChartInstance: null,
+  neonConfig: null,
+  neonStatus: 'checking',
+  lastSyncTime: null,
 
   init() {
     this.loadData();
     this.initTheme();
+    this.initNeon();
     this.setupEventListeners();
     this.updatePeriodDisplay();
     this.renderAll();
@@ -274,6 +288,7 @@ const app = {
 
   saveData() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(this.data));
+    this.syncToNeon(true);
   },
 
   // Alternância de Tema Claro / Escuro
@@ -355,6 +370,12 @@ const app = {
     });
     document.getElementById('fileImportInput').addEventListener('change', (e) => this.importBackup(e));
     document.getElementById('btnResetDemoData').addEventListener('click', () => this.resetDemoData());
+
+    // Sincronização em Nuvem com Neon
+    const btnNeonSync = document.getElementById('btnNeonSync');
+    if (btnNeonSync) btnNeonSync.addEventListener('click', () => this.openNeonModal());
+    const btnTopNeonSync = document.getElementById('btnTopNeonSync');
+    if (btnTopNeonSync) btnTopNeonSync.addEventListener('click', () => this.openNeonModal());
 
     // Botões de Ação
     document.getElementById('btnQuickAdd').addEventListener('click', () => this.openQuickAddModal());
@@ -1990,6 +2011,189 @@ const app = {
       this.saveData();
       this.renderAll();
       this.showToast('Dados de exemplo recarregados!');
+    }
+  },
+
+  // ==========================================
+  // INTEGRAÇÃO NUVEM: NEON POSTGRESQL
+  // ==========================================
+  initNeon() {
+    const saved = localStorage.getItem(NEON_CONFIG_KEY);
+    if (saved) {
+      try {
+        this.neonConfig = { ...DEFAULT_NEON_CONFIG, ...JSON.parse(saved) };
+      } catch (e) {
+        this.neonConfig = { ...DEFAULT_NEON_CONFIG };
+      }
+    } else {
+      this.neonConfig = { ...DEFAULT_NEON_CONFIG };
+    }
+
+    this.updateNeonUI('checking', 'Conectando ao Neon...');
+    if (this.neonConfig.enabled) {
+      this.fetchFromNeon(false);
+    } else {
+      this.updateNeonUI('offline', 'Nuvem Pausada');
+    }
+  },
+
+  updateNeonUI(status, label) {
+    this.neonStatus = status;
+    const dotEl = document.getElementById('sidebarNeonDot');
+    const textEl = document.getElementById('sidebarNeonText');
+    const topIcon = document.getElementById('topNeonIcon');
+    const topText = document.getElementById('topNeonText');
+
+    if (dotEl) {
+      dotEl.className = 'neon-status-dot ' + (status === 'syncing' ? 'syncing' : status === 'offline' ? 'offline' : '');
+    }
+    if (textEl) textEl.textContent = label || (status === 'online' ? 'Neon Conectado' : 'Neon Offline');
+
+    if (topIcon) {
+      if (status === 'online') {
+        topIcon.className = 'ph-bold ph-cloud-check text-success';
+      } else if (status === 'syncing') {
+        topIcon.className = 'ph-bold ph-arrows-clockwise text-gold';
+      } else {
+        topIcon.className = 'ph-bold ph-cloud-slash text-danger';
+      }
+    }
+    if (topText) topText.textContent = (status === 'online' ? 'Nuvem Ativa' : status === 'syncing' ? 'Sincronizando...' : 'Nuvem Offline');
+  },
+
+  async queryNeon(query) {
+    if (!this.neonConfig || !this.neonConfig.endpoint || !this.neonConfig.connectionString) {
+      throw new Error('Configuração do Neon incompleta.');
+    }
+    const res = await fetch(this.neonConfig.endpoint, {
+      method: 'POST',
+      headers: {
+        'Neon-Connection-String': this.neonConfig.connectionString,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ query })
+    });
+    const json = await res.json();
+    if (json.message || json.code) {
+      throw new Error(json.message || 'Erro ao executar query no Neon');
+    }
+    return json;
+  },
+
+  async fetchFromNeon(notify = false) {
+    try {
+      this.updateNeonUI('syncing', 'Sincronizando...');
+      const result = await this.queryNeon("SELECT data, updated_at FROM financial_data WHERE id = 'current';");
+      if (result && result.rows && result.rows.length > 0) {
+        const cloudData = result.rows[0].data;
+        const updatedAt = result.rows[0].updated_at;
+        if (cloudData && typeof cloudData === 'object') {
+          this.data = cloudData;
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(this.data));
+          this.lastSyncTime = new Date(updatedAt);
+          this.updateNeonUI('online', 'Neon Conectado');
+          this.renderAll();
+          if (notify) this.showToast('Dados sincronizados com o Neon!');
+          return;
+        }
+      }
+      await this.syncToNeon(true);
+      this.updateNeonUI('online', 'Neon Conectado');
+    } catch (err) {
+      console.warn('Erro ao conectar ao Neon:', err);
+      this.updateNeonUI('offline', 'Modo Local (Offline)');
+      if (notify) this.showToast('Não foi possível conectar ao Neon. Usando dados locais.');
+    }
+  },
+
+  async syncToNeon(silent = true) {
+    if (!this.neonConfig?.enabled) return;
+    try {
+      this.updateNeonUI('syncing', 'Salvando na Nuvem...');
+      const jsonStr = JSON.stringify(this.data).replace(/'/g, "''");
+      const query = `INSERT INTO financial_data (id, data, updated_at) VALUES ('current', '${jsonStr}'::jsonb, NOW()) ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, updated_at = NOW() RETURNING updated_at;`;
+      const result = await this.queryNeon(query);
+      if (result && result.rows && result.rows[0]) {
+        this.lastSyncTime = new Date(result.rows[0].updated_at);
+      } else {
+        this.lastSyncTime = new Date();
+      }
+      this.updateNeonUI('online', 'Neon Conectado');
+      if (!silent) this.showToast('Dados salvos na nuvem Neon PostgreSQL!');
+    } catch (err) {
+      console.warn('Falha no upload para Neon:', err);
+      this.updateNeonUI('offline', 'Salvo apenas Local');
+    }
+  },
+
+  openNeonModal() {
+    const lastSyncStr = this.lastSyncTime ? this.lastSyncTime.toLocaleString('pt-BR') : 'Ainda não sincronizado nesta sessão';
+    const statusColor = this.neonStatus === 'online' ? 'var(--success)' : (this.neonStatus === 'syncing' ? 'var(--gold)' : 'var(--danger)');
+    const statusLabel = this.neonStatus === 'online' ? '🟢 Conectado e Sincronizado' : (this.neonStatus === 'syncing' ? '🟡 Sincronizando...' : '🔴 Offline / Salvo Local');
+
+    const html = `
+      <div style="display:flex; flex-direction:column; gap:16px;">
+        <div style="background:var(--bg-card-solid); border:1px solid var(--border-color); border-radius:var(--radius-md); padding:16px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <i class="ph-bold ph-database" style="color:#00E699; font-size:22px;"></i>
+              <strong>Neon Serverless PostgreSQL</strong>
+            </div>
+            <span class="badge ${this.neonStatus === 'online' ? 'badge-green' : 'badge-gold'}">
+              ${this.neonConfig.projectName || 'controle-financeiro'}
+            </span>
+          </div>
+
+          <div style="font-size:0.85rem; color:var(--text-muted); display:flex; flex-direction:column; gap:6px;">
+            <div><strong>Região:</strong> ${this.neonConfig.region || 'São Paulo (aws-sa-east-1)'}</div>
+            <div><strong>Status da Nuvem:</strong> <span style="color:${statusColor}; font-weight:700;">${statusLabel}</span></div>
+            <div><strong>Último Sincronismo:</strong> ${lastSyncStr}</div>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          <button class="btn-primary" style="flex:1;" onclick="app.fetchFromNeon(true); app.closeModal();">
+            <i class="ph ph-arrows-clockwise"></i> Baixar da Nuvem
+          </button>
+          <button class="btn-secondary" style="flex:1;" onclick="app.syncToNeon(false); app.closeModal();">
+            <i class="ph ph-cloud-arrow-up"></i> Enviar p/ Nuvem
+          </button>
+        </div>
+
+        <details style="font-size:0.82rem; color:var(--text-muted); background:rgba(255,255,255,0.03); padding:12px; border-radius:var(--radius-sm); border:1px solid var(--border-color);">
+          <summary style="cursor:pointer; font-weight:600; color:var(--text-main); margin-bottom:8px;">
+            <i class="ph ph-gear"></i> Detalhes da Conexão Neon
+          </summary>
+          <div style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">
+            <div>
+              <label class="form-label" style="font-size:0.75rem;">Endpoint HTTP</label>
+              <input type="text" id="neonEndpointInput" class="form-control" style="font-size:0.75rem;" value="${this.neonConfig.endpoint}">
+            </div>
+            <div>
+              <label class="form-label" style="font-size:0.75rem;">Connection String</label>
+              <input type="password" id="neonConnInput" class="form-control" style="font-size:0.75rem;" value="${this.neonConfig.connectionString}">
+            </div>
+            <button class="btn-secondary btn-sm" onclick="app.saveNeonConfig()">Salvar Configuração</button>
+          </div>
+        </details>
+
+        <div class="form-footer" style="margin-top:8px;">
+          <button type="button" class="btn-secondary" onclick="app.closeModal()">Fechar</button>
+        </div>
+      </div>
+    `;
+    this.openModal('Sincronização em Nuvem (Neon)', html);
+  },
+
+  saveNeonConfig() {
+    const ep = document.getElementById('neonEndpointInput')?.value.trim();
+    const conn = document.getElementById('neonConnInput')?.value.trim();
+    if (ep && conn) {
+      this.neonConfig.endpoint = ep;
+      this.neonConfig.connectionString = conn;
+      localStorage.setItem(NEON_CONFIG_KEY, JSON.stringify(this.neonConfig));
+      this.showToast('Configurações do Neon salvas!');
+      this.fetchFromNeon(true);
     }
   },
 

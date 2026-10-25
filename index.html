@@ -78,6 +78,10 @@
           </button>
           <input type="file" id="fileImportInput" accept=".json" style="display:none;">
         </div>
+        <button id="btnNeonSync" class="btn-neon-status" title="Status da Nuvem Neon PostgreSQL">
+          <span class="neon-status-dot" id="sidebarNeonDot"></span>
+          <span id="sidebarNeonText">Neon Conectado</span>
+        </button>
       </div>
     </aside>
 
@@ -104,7 +108,11 @@
           </div>
 
           <!-- Ação rápida -->
-          <div class="quick-actions">
+          <div class="quick-actions" style="display: flex; gap: 10px; align-items: center;">
+            <button id="btnTopNeonSync" class="btn-cloud-sync" title="Status da Nuvem Neon (Clique para gerenciar)">
+              <i class="ph-bold ph-cloud-check text-success" id="topNeonIcon"></i>
+              <span id="topNeonText">Nuvem Neon</span>
+            </button>
             <button class="btn-primary" id="btnQuickAdd">
               <i class="ph-bold ph-plus"></i> Novo Lançamento
             </button>
