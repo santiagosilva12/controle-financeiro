@@ -60,6 +60,10 @@
           <i class="ph ph-piggy-bank"></i>
           <span>Meta de Poupança</span>
         </a>
+        <a href="#evolucao" class="nav-item" data-tab="evolucao">
+          <i class="ph-bold ph-chart-line-up"></i>
+          <span>Evolução Mês a Mês</span>
+        </a>
       </nav>
 
       <div class="sidebar-footer">
@@ -590,6 +594,90 @@
             <span class="label">Total em Investimentos (Rico)</span>
             <div class="val text-accent-orange" id="poupancaRicoValor">R$ 0,00</div>
             <span class="sub">Patrimônio aplicado rendendo</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- SEÇÃO 7: EVOLUÇÃO MÊS A MÊS -->
+      <section id="section-evolucao" class="content-section">
+        <div class="section-header-banner">
+          <div>
+            <h2>Evolução Financeira Mês a Mês</h2>
+            <p>Acompanhe o comparativo histórico e as projeções futuras de entradas, despesas, faturas e saldo acumulado.</p>
+          </div>
+          <div class="btn-group">
+            <button class="filter-pill active" id="btnEvolucao2026" onclick="app.setEvolutionYear(2026)">Ano 2026</button>
+            <button class="filter-pill" id="btnEvolucao2027" onclick="app.setEvolutionYear(2027)">Ano 2027</button>
+          </div>
+        </div>
+
+        <!-- 4 Cards de Resumo da Evolução Anual -->
+        <div class="poupanca-cards-grid" style="margin-bottom: 24px;">
+          <div class="poupanca-stat-card">
+            <span class="label"><i class="ph-bold ph-trend-up text-success"></i> Média de Entradas / Mês</span>
+            <div class="val text-success" id="evolucaoMediaEntradas">R$ 0,00</div>
+            <span class="sub" id="evolucaoTotalEntradasAno">Total no ano: R$ 0,00</span>
+          </div>
+
+          <div class="poupanca-stat-card">
+            <span class="label"><i class="ph-bold ph-receipt text-danger"></i> Média de Despesas / Mês</span>
+            <div class="val text-danger" id="evolucaoMediaDespesas">R$ 0,00</div>
+            <span class="sub" id="evolucaoTotalDespesasAno">Contas + Faturas no ano: R$ 0,00</span>
+          </div>
+
+          <div class="poupanca-stat-card">
+            <span class="label"><i class="ph-bold ph-scales text-gold"></i> Média de Sobra Líquida</span>
+            <div class="val text-gold" id="evolucaoMediaSobra">R$ 0,00</div>
+            <span class="sub" id="evolucaoTotalSobraAno">Economia projetada no ano: R$ 0,00</span>
+          </div>
+
+          <div class="poupanca-stat-card">
+            <span class="label"><i class="ph-bold ph-diamonds-four text-accent-blue"></i> Maior Sobra do Ano</span>
+            <div class="val text-accent-blue" id="evolucaoMelhorMes">R$ 0,00</div>
+            <span class="sub" id="evolucaoMelhorMesNome">Mês de maior economia</span>
+          </div>
+        </div>
+
+        <!-- Gráfico de Comparação Mês a Mês -->
+        <div class="chart-card" style="margin-bottom: 24px; min-height: 400px;">
+          <div class="card-header-flex">
+            <h3><i class="ph-bold ph-chart-bar"></i> Comparativo Mensal: Entradas vs Despesas vs Sobra Líquida</h3>
+            <span class="badge badge-subtle" id="evolutionChartBadge">Ano de 2026</span>
+          </div>
+          <div class="chart-wrapper" style="height: 330px; position: relative;">
+            <canvas id="evolutionChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Tabela Completa de Evolução Mês a Mês -->
+        <div class="table-container">
+          <div class="table-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+            <div>
+              <h3><i class="ph ph-table"></i> Demonstrativo Financeiro Mensal Detalhado</h3>
+              <span class="table-sub">Visão consolidada de todas as receitas, custos fixos, gastos variáveis e sobras de cada mês.</span>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="data-table" id="evolutionTable">
+              <thead>
+                <tr>
+                  <th>Mês / Ano</th>
+                  <th>Salários (15 + 30)</th>
+                  <th>Consultorias</th>
+                  <th>Total Entradas</th>
+                  <th>Contas Fixas</th>
+                  <th>Desp. Variáveis</th>
+                  <th>Faturas Cartões</th>
+                  <th>Total Despesas</th>
+                  <th>Sobra Líquida</th>
+                  <th>% Poupança</th>
+                  <th class="text-right">Ação</th>
+                </tr>
+              </thead>
+              <tbody id="evolutionTableBody">
+                <!-- Preenchido via JS -->
+              </tbody>
+            </table>
           </div>
         </div>
       </section>

@@ -240,6 +240,8 @@ const app = {
   currentDate: new Date(2026, 9, 1), // Outubro 2026
   cashflowChartInstance: null,
   distributionChartInstance: null,
+  evolutionChartInstance: null,
+  evolutionYear: 2026,
   neonConfig: null,
   neonStatus: 'checking',
   lastSyncTime: null,
@@ -524,6 +526,8 @@ const app = {
     // Se mudou para dashboard, atualizar gráficos
     if (tabId === 'dashboard') {
       setTimeout(() => this.renderCharts(), 50);
+    } else if (tabId === 'evolucao') {
+      setTimeout(() => this.renderEvolutionSection(), 50);
     }
   },
 
@@ -594,26 +598,10 @@ const app = {
   },
 
   // ==========================================
-  // CÁLCULOS PRINCIPAIS
+  // CÁLCULOS PRINCIPAIS POR MÊS
   // ==========================================
-  getTotals() {
-    // Saldo em Contas (Nubank Vitor, Nubank Andressa, Rico, Bradesco)
-    const saldoContas = this.data.accounts.reduce((acc, a) => acc + (Number(a.balance) || 0), 0);
-
-    // Saldo Rico isolado (investimento)
-    const saldoRico = this.data.accounts
-      .filter(a => a.institution === 'rico')
-      .reduce((acc, a) => acc + (Number(a.balance) || 0), 0);
-
-    // FGTS (Apenas Andressa)
-    const fgtsVitor = 0;
-    const fgtsAndressa = Number(this.data.fgts?.andressa) || 0;
-    const fgtsTotal = fgtsAndressa;
-
-    // Mês Selecionado na Barra de Navegação
-    const monthKey = this.getCurrentMonthKey();
-
-    // Faturas de Cartões do Mês Selecionado
+  getMonthTotals(monthKey = this.getCurrentMonthKey()) {
+    // Faturas de Cartões do Mês
     const currentInvoices = this.data.creditCards.map(c => {
       const inv = this.getCardInvoice(c, monthKey);
       return { card: c, invoice: inv };
@@ -637,7 +625,7 @@ const app = {
     const salariosRecebidosTotal = salarioDia15Recebido + salarioDia30Recebido;
     const salariosPendentesTotal = salariosTotal - salariosRecebidosTotal;
 
-    // Consultorias (PUXAR APENAS AS DO MÊS SELECIONADO)
+    // Consultorias (PUXAR APENAS AS DO MÊS ESPECIFICADO)
     const consultoriasDoMes = this.data.consultancies.filter(c => c.date && c.date.startsWith(monthKey));
     const consultoriasRecebidas = consultoriasDoMes
       .filter(c => c.status === 'recebido')
@@ -647,19 +635,11 @@ const app = {
       .reduce((acc, c) => acc + (Number(c.amount) || 0), 0);
     const consultoriasTotal = consultoriasRecebidas + consultoriasPendentes;
 
-    // ========================================================
     // TOTAIS CONSOLIDADOS DE ENTRADAS / RECEITAS DO MÊS
-    // ========================================================
-    // TOTAL GERAL DO MÊS (Previsto: Salários + Consultorias)
     const totalGeralMes = salariosTotal + consultoriasTotal;
-
-    // TOTAL JÁ RECEBIDO NO MÊS (Salários Recebidos + Consultorias Recebidas)
     const totalRecebidoMes = salariosRecebidosTotal + consultoriasRecebidas;
-
-    // TOTAL PENDENTE A RECEBER NO MÊS
     const totalPendenteMes = salariosPendentesTotal + consultoriasPendentes;
 
-    // Total de Entradas Realizadas (usado para fluxo de caixa do momento)
     const totalEntradas = totalRecebidoMes;
     const totalEntradasPrevistas = totalGeralMes;
 
@@ -669,19 +649,16 @@ const app = {
       .filter(e => e.type === 'fixa')
       .reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
 
-    // 2. Despesas Variáveis (SOMENTE as que vencem no mês selecionado)
+    // 2. Despesas Variáveis (SOMENTE as que vencem no mês especificado)
     const despesasVariaveis = this.data.expenses
       .filter(e => e.type === 'variavel' && e.dueDate && e.dueDate.startsWith(monthKey))
       .reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
 
     const totalDespesasCadastradas = despesasFixas + despesasVariaveis;
-
-    // Despesas Totais do Mês = Contas Cadastradas + Faturas de Cartão
     const totalDespesasComFaturas = totalDespesasCadastradas + totalFaturas;
 
-    // Sobra Líquida do Mês (Considerando o Total Geral Previsto)
+    // Sobras
     const sobraMes = totalGeralMes - totalDespesasComFaturas;
-    // Sobra Realizada no Momento (Já Recebido - Despesas Totais)
     const sobraRealizada = totalRecebidoMes - totalDespesasComFaturas;
 
     // Contas Pendentes a Pagar no Mês Selecionado
@@ -695,16 +672,8 @@ const app = {
 
     const totalDespesasPendentes = contasFixasPendentes + despesasVariaveisPendentes + faturasPendentes;
 
-    // Patrimônio Líquido Total Consolidado
-    // (Saldo em Contas + FGTS) - Faturas de Cartões Pendentes
-    const patrimonioTotal = (saldoContas + fgtsTotal) - faturasPendentes;
-
     return {
-      saldoContas,
-      saldoRico,
-      fgtsVitor,
-      fgtsAndressa,
-      fgtsTotal,
+      monthKey,
       totalFaturas,
       faturasPendentes,
       salarioVitor,
@@ -731,8 +700,39 @@ const app = {
       totalDespesasComFaturas,
       totalDespesasPendentes,
       sobraMes,
-      sobraRealizada,
-      patrimonioTotal
+      sobraRealizada
+    };
+  },
+
+  getTotals() {
+    // Saldo em Contas (Nubank Vitor, Nubank Andressa, Rico, Bradesco)
+    const saldoContas = this.data.accounts.reduce((acc, a) => acc + (Number(a.balance) || 0), 0);
+
+    // Saldo Rico isolado (investimento)
+    const saldoRico = this.data.accounts
+      .filter(a => a.institution === 'rico')
+      .reduce((acc, a) => acc + (Number(a.balance) || 0), 0);
+
+    // FGTS (Apenas Andressa)
+    const fgtsVitor = 0;
+    const fgtsAndressa = Number(this.data.fgts?.andressa) || 0;
+    const fgtsTotal = fgtsAndressa;
+
+    // Mês Selecionado no Painel
+    const monthKey = this.getCurrentMonthKey();
+    const monthTotals = this.getMonthTotals(monthKey);
+
+    // Patrimônio Líquido Total Consolidado
+    const patrimonioTotal = (saldoContas + fgtsTotal) - monthTotals.faturasPendentes;
+
+    return {
+      saldoContas,
+      saldoRico,
+      fgtsVitor,
+      fgtsAndressa,
+      fgtsTotal,
+      patrimonioTotal,
+      ...monthTotals
     };
   },
 
@@ -749,6 +749,7 @@ const app = {
     this.renderConsolidatedExpensesSummary();
     this.renderExpensesTable();
     this.renderSavingsSection();
+    this.renderEvolutionSection();
     this.renderCharts();
   },
 
@@ -1455,6 +1456,217 @@ const app = {
 
     document.getElementById('poupancaDisponivelMes').textContent = formatMoney(Math.max(0, t.sobraMes));
     document.getElementById('poupancaRicoValor').textContent = formatMoney(t.saldoRico);
+  },
+
+  // ==========================================
+  // SEÇÃO: EVOLUÇÃO MÊS A MÊS
+  // ==========================================
+  setEvolutionYear(year) {
+    this.evolutionYear = Number(year) || 2026;
+    const btn2026 = document.getElementById('btnEvolucao2026');
+    const btn2027 = document.getElementById('btnEvolucao2027');
+    if (btn2026) btn2026.classList.toggle('active', this.evolutionYear === 2026);
+    if (btn2027) btn2027.classList.toggle('active', this.evolutionYear === 2027);
+
+    const badgeEl = document.getElementById('evolutionChartBadge');
+    if (badgeEl) badgeEl.textContent = `Ano de ${this.evolutionYear}`;
+
+    this.renderEvolutionSection();
+  },
+
+  renderEvolutionSection() {
+    const year = this.evolutionYear || 2026;
+    const currentKey = this.getCurrentMonthKey();
+    const monthsData = [];
+
+    const monthNames = [
+      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+    ];
+
+    let sumEntradas = 0;
+    let sumDespesas = 0;
+    let sumSobra = 0;
+    let bestMonth = null;
+    let maxSobra = -Infinity;
+
+    for (let m = 1; m <= 12; m++) {
+      const monthKey = `${year}-${String(m).padStart(2, '0')}`;
+      const t = this.getMonthTotals(monthKey);
+      const name = monthNames[m - 1];
+
+      sumEntradas += t.totalGeralMes;
+      sumDespesas += t.totalDespesasComFaturas;
+      sumSobra += t.sobraMes;
+
+      if (t.sobraMes > maxSobra) {
+        maxSobra = t.sobraMes;
+        bestMonth = { name, monthKey, sobra: t.sobraMes };
+      }
+
+      monthsData.push({
+        monthKey,
+        name,
+        isCurrent: monthKey === currentKey,
+        ...t
+      });
+    }
+
+    const mediaEntradas = sumEntradas / 12;
+    const mediaDespesas = sumDespesas / 12;
+    const mediaSobra = sumSobra / 12;
+
+    const mediaEntradasEl = document.getElementById('evolucaoMediaEntradas');
+    if (mediaEntradasEl) mediaEntradasEl.textContent = formatMoney(mediaEntradas);
+
+    const totalEntradasAnoEl = document.getElementById('evolucaoTotalEntradasAno');
+    if (totalEntradasAnoEl) totalEntradasAnoEl.textContent = `Total no ano: ${formatMoney(sumEntradas)}`;
+
+    const mediaDespesasEl = document.getElementById('evolucaoMediaDespesas');
+    if (mediaDespesasEl) mediaDespesasEl.textContent = formatMoney(mediaDespesas);
+
+    const totalDespesasAnoEl = document.getElementById('evolucaoTotalDespesasAno');
+    if (totalDespesasAnoEl) totalDespesasAnoEl.textContent = `Contas + Faturas no ano: ${formatMoney(sumDespesas)}`;
+
+    const mediaSobraEl = document.getElementById('evolucaoMediaSobra');
+    if (mediaSobraEl) {
+      mediaSobraEl.textContent = formatMoney(mediaSobra);
+      mediaSobraEl.className = mediaSobra >= 0 ? 'val text-gold' : 'val text-danger';
+    }
+
+    const totalSobraAnoEl = document.getElementById('evolucaoTotalSobraAno');
+    if (totalSobraAnoEl) totalSobraAnoEl.textContent = `Economia no ano: ${formatMoney(sumSobra)}`;
+
+    const melhorMesEl = document.getElementById('evolucaoMelhorMes');
+    if (melhorMesEl && bestMonth) melhorMesEl.textContent = formatMoney(bestMonth.sobra);
+
+    const melhorMesNomeEl = document.getElementById('evolucaoMelhorMesNome');
+    if (melhorMesNomeEl && bestMonth) melhorMesNomeEl.textContent = `Maior economia em ${bestMonth.name}/${year}`;
+
+    const tbody = document.getElementById('evolutionTableBody');
+    if (tbody) {
+      tbody.innerHTML = monthsData.map(d => {
+        const taxaPoupanca = d.totalGeralMes > 0 ? Math.round((d.sobraMes / d.totalGeralMes) * 100) : 0;
+        const poupancaBadge = d.sobraMes >= 0 
+          ? `<span class="badge badge-green">${taxaPoupanca}%</span>` 
+          : `<span class="badge badge-danger">${taxaPoupanca}%</span>`;
+
+        return `
+          <tr style="${d.isCurrent ? 'background: rgba(59, 130, 246, 0.08); font-weight: 500;' : ''}">
+            <td>
+              <strong>${d.name} / ${year}</strong>
+              ${d.isCurrent ? '<span class="badge badge-blue" style="margin-left:6px;">Mês Atual</span>' : ''}
+            </td>
+            <td>${formatMoney(d.salariosTotal)}</td>
+            <td>${d.consultoriasTotal > 0 ? `<strong class="text-success">${formatMoney(d.consultoriasTotal)}</strong>` : '<span class="text-muted">R$ 0,00</span>'}</td>
+            <td><strong class="text-success">${formatMoney(d.totalGeralMes)}</strong></td>
+            <td>${formatMoney(d.despesasFixas)}</td>
+            <td>${d.despesasVariaveis > 0 ? formatMoney(d.despesasVariaveis) : '<span class="text-muted">R$ 0,00</span>'}</td>
+            <td>${d.totalFaturas > 0 ? `<strong class="text-purple">${formatMoney(d.totalFaturas)}</strong>` : '<span class="text-muted">R$ 0,00</span>'}</td>
+            <td><strong class="text-danger">${formatMoney(d.totalDespesasComFaturas)}</strong></td>
+            <td>
+              <strong class="${d.sobraMes >= 0 ? 'text-success' : 'text-danger'}">
+                ${formatMoney(d.sobraMes)}
+              </strong>
+            </td>
+            <td>${poupancaBadge}</td>
+            <td class="text-right">
+              <button class="btn-secondary btn-sm" onclick="app.setPeriod('${d.monthKey}'); app.switchTab('dashboard');" title="Abrir este mês no painel principal">
+                <i class="ph ph-calendar-blank"></i> Abrir
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    this.renderEvolutionChart(monthsData, year);
+  },
+
+  renderEvolutionChart(monthsData, year) {
+    if (typeof Chart === 'undefined') return;
+    const canvas = document.getElementById('evolutionChart');
+    if (!canvas) return;
+
+    if (this.evolutionChartInstance) {
+      this.evolutionChartInstance.destroy();
+    }
+
+    const isDark = document.body.classList.contains('theme-dark');
+    const textColor = isDark ? '#94A3B8' : '#475569';
+    const gridColor = isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)';
+
+    const labels = monthsData.map(d => d.name.slice(0, 3));
+    const entradas = monthsData.map(d => d.totalGeralMes);
+    const despesas = monthsData.map(d => d.totalDespesasComFaturas);
+    const sobras = monthsData.map(d => d.sobraMes);
+
+    this.evolutionChartInstance = new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: 'Entradas Totais (R$)',
+            data: entradas,
+            backgroundColor: 'rgba(16, 185, 129, 0.85)',
+            borderRadius: 6,
+            order: 2
+          },
+          {
+            label: 'Despesas + Faturas (R$)',
+            data: despesas,
+            backgroundColor: 'rgba(239, 68, 68, 0.85)',
+            borderRadius: 6,
+            order: 3
+          },
+          {
+            label: 'Sobra Líquida (R$)',
+            data: sobras,
+            type: 'line',
+            borderColor: '#F59E0B',
+            backgroundColor: '#F59E0B',
+            borderWidth: 3,
+            pointBackgroundColor: '#F59E0B',
+            pointRadius: 4,
+            tension: 0.3,
+            order: 1
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'top',
+            labels: {
+              color: textColor,
+              boxWidth: 12,
+              font: { size: 12 }
+            }
+          },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => ` ${ctx.dataset.label}: ${formatMoney(ctx.raw)}`
+            }
+          }
+        },
+        scales: {
+          y: {
+            ticks: {
+              color: textColor,
+              callback: (v) => 'R$ ' + v.toLocaleString('pt-BR')
+            },
+            grid: { color: gridColor }
+          },
+          x: {
+            ticks: { color: textColor },
+            grid: { display: false }
+          }
+        }
+      }
+    });
   },
 
   // ==========================================
