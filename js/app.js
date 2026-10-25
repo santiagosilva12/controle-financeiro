@@ -244,6 +244,7 @@ const app = {
   cashflowChartInstance: null,
   distributionChartInstance: null,
   evolutionChartInstance: null,
+  savingsProjectionChartInstance: null,
   evolutionYear: 2026,
   neonConfig: null,
   neonStatus: 'checking',
@@ -336,6 +337,7 @@ const app = {
     }
     this.updateThemeButton();
     this.renderCharts();
+    this.renderSavingsSection();
   },
 
   updateThemeButton() {
@@ -553,6 +555,8 @@ const app = {
       setTimeout(() => this.renderCharts(), 50);
     } else if (tabId === 'evolucao') {
       setTimeout(() => this.renderEvolutionSection(), 50);
+    } else if (tabId === 'poupanca') {
+      setTimeout(() => this.renderSavingsSection(), 50);
     }
   },
 
@@ -1819,21 +1823,335 @@ const app = {
   },
 
   // ==========================================
-  // SEÇÃO: POUPANÇA & PROJEÇÕES
+  // SEÇÃO: POUPANÇA & PROJEÇÕES (OUTUBRO/2026 A MARÇO/2027)
   // ==========================================
-  renderSavingsSection() {
-    const t = this.getTotals();
-    const monthKey = this.getCurrentMonthKey();
-    const meta = (this.data.monthlySavingsGoals && this.data.monthlySavingsGoals[monthKey] !== undefined)
-      ? Number(this.data.monthlySavingsGoals[monthKey])
-      : (Number(this.data.savingsGoal) || 2000.00);
-    document.getElementById('poupancaMetaValor').textContent = formatMoney(meta);
-    
-    const pctRenda = t.salariosTotal > 0 ? Math.round((meta / t.salariosTotal) * 100) : 0;
-    document.getElementById('poupancaMetaPercentSalario').textContent = `Equivale a aprox. ${pctRenda}% da renda fixa conjunta`;
+  getSavingsGoalForMonth(monthKey) {
+    if (this.data.monthlySavingsGoals && this.data.monthlySavingsGoals[monthKey] !== undefined) {
+      return Number(this.data.monthlySavingsGoals[monthKey]) || 0;
+    }
+    if (this.data.monthlySavingsGoals && this.data.monthlySavingsGoals['2026-10'] !== undefined) {
+      return Number(this.data.monthlySavingsGoals['2026-10']) || 0;
+    }
+    return Number(this.data.savingsGoal) || 4000.00;
+  },
 
-    const poupancaDisponivelMes = document.getElementById('poupancaDisponivelMes');
-    if (poupancaDisponivelMes) poupancaDisponivelMes.textContent = formatMoney(Math.max(0, t.sobraMes));
+  applyProjectionGoalToAll(val = null) {
+    const input = document.getElementById('inputMetaProjecaoGeral');
+    const valor = val !== null ? parseFloat(val) : (input ? parseFloat(input.value) : 0);
+
+    if (isNaN(valor) || valor < 0) {
+      alert('Por favor, informe um valor de meta válido.');
+      return;
+    }
+
+    if (!this.data.monthlySavingsGoals) {
+      this.data.monthlySavingsGoals = {};
+    }
+
+    const projectionMonthKeys = ['2026-10', '2026-11', '2026-12', '2027-01', '2027-02', '2027-03'];
+    projectionMonthKeys.forEach(key => {
+      this.data.monthlySavingsGoals[key] = valor;
+    });
+    this.data.savingsGoal = valor;
+
+    this.saveData();
+    this.renderAll();
+    this.showToast(`Meta de ${formatMoney(valor)}/mês aplicada para todos os 6 meses (Out/26 a Mar/27)!`);
+  },
+
+  updateSingleMonthSavingsGoal(monthKey, val) {
+    const valor = parseFloat(val) || 0;
+    if (isNaN(valor) || valor < 0) return;
+
+    if (!this.data.monthlySavingsGoals) {
+      this.data.monthlySavingsGoals = {};
+    }
+    this.data.monthlySavingsGoals[monthKey] = valor;
+
+    if (monthKey === this.getCurrentMonthKey()) {
+      this.data.savingsGoal = valor;
+    }
+
+    this.saveData();
+    this.renderAll();
+    const label = this.formatMonthKeyLabel(monthKey);
+    this.showToast(`Meta de poupança de ${label} atualizada para ${formatMoney(valor)}!`);
+  },
+
+  renderSavingsSection() {
+    const tCurrent = this.getTotals();
+    const currentKey = this.getCurrentMonthKey();
+
+    const projectionMonths = [
+      { key: '2026-10', name: 'Outubro', year: 2026, label: 'Out/26' },
+      { key: '2026-11', name: 'Novembro', year: 2026, label: 'Nov/26' },
+      { key: '2026-12', name: 'Dezembro', year: 2026, label: 'Dez/26' },
+      { key: '2027-01', name: 'Janeiro', year: 2027, label: 'Jan/27' },
+      { key: '2027-02', name: 'Fevereiro', year: 2027, label: 'Fev/27' },
+      { key: '2027-03', name: 'Março', year: 2027, label: 'Mar/27' }
+    ];
+
+    let acumuladoPoupanca = 0;
+    let sumSobra = 0;
+
+    const projectionData = projectionMonths.map((m, index) => {
+      const t = this.getMonthTotals(m.key);
+      const metaMes = this.getSavingsGoalForMonth(m.key);
+      acumuladoPoupanca += metaMes;
+      sumSobra += t.sobraMes;
+
+      const sobraMes = t.sobraMes;
+      const pctSobra = sobraMes > 0 ? Math.round((metaMes / sobraMes) * 100) : 0;
+      const livreMes = sobraMes - metaMes;
+
+      return {
+        ...m,
+        ...t,
+        metaMes,
+        acumuladoPoupanca,
+        pctSobra,
+        livreMes,
+        isCurrent: m.key === currentKey
+      };
+    });
+
+    const totalAcumuladoMarco = acumuladoPoupanca;
+    const metaBase = this.getSavingsGoalForMonth(currentKey);
+
+    // 1. Atualizar Cards Principais
+    const metaBaseEl = document.getElementById('projMetaMensalBase');
+    if (metaBaseEl) metaBaseEl.textContent = formatMoney(metaBase);
+
+    const metaBasePctEl = document.getElementById('projMetaMensalPct');
+    if (metaBasePctEl) {
+      const pctRenda = tCurrent.salariosTotal > 0 ? Math.round((metaBase / tCurrent.salariosTotal) * 100) : 0;
+      metaBasePctEl.textContent = `Equivale a aprox. ${pctRenda}% da renda fixa conjunta`;
+    }
+
+    const totalAcumMarcoEl = document.getElementById('projTotalAcumuladoMarco');
+    if (totalAcumMarcoEl) totalAcumMarcoEl.textContent = formatMoney(totalAcumuladoMarco);
+
+    const totalAcumSubEl = document.getElementById('projTotalAcumuladoSub');
+    if (totalAcumSubEl) totalAcumSubEl.textContent = `6 meses guardando ${formatMoney(totalAcumuladoMarco / 6)} em média`;
+
+    const totalSobraEl = document.getElementById('projTotalSobraPeriodo');
+    if (totalSobraEl) totalSobraEl.textContent = formatMoney(sumSobra);
+
+    const sobraCompromissadaEl = document.getElementById('projSobraCompromissadaSub');
+    if (sobraCompromissadaEl) {
+      const pctSobraGeral = sumSobra > 0 ? Math.round((totalAcumuladoMarco / sumSobra) * 100) : 0;
+      sobraCompromissadaEl.textContent = `${pctSobraGeral}% da sobra total prevista será guardada`;
+    }
+
+    // Saldo patrimonial projetado
+    const patrimonioAtual = tCurrent.patrimonioTotal || 0;
+    const patrimonioProjetadoMarco = patrimonioAtual + totalAcumuladoMarco;
+
+    const patrimonioMarcoEl = document.getElementById('projPatrimonioMarco');
+    if (patrimonioMarcoEl) patrimonioMarcoEl.textContent = formatMoney(patrimonioProjetadoMarco);
+
+    const crescimentoPatrimonioEl = document.getElementById('projCrescimentoPatrimonioSub');
+    if (crescimentoPatrimonioEl) {
+      crescimentoPatrimonioEl.textContent = `+${formatMoney(totalAcumuladoMarco)} sobre o patrimônio atual`;
+    }
+
+    // Input de Meta Geral
+    const inputGeral = document.getElementById('inputMetaProjecaoGeral');
+    if (inputGeral && document.activeElement !== inputGeral) {
+      inputGeral.value = metaBase;
+    }
+
+    const badgeGoalFinal = document.getElementById('badgeProjGoalFinal');
+    if (badgeGoalFinal) {
+      badgeGoalFinal.textContent = `Meta em Março/27: ${formatMoney(totalAcumuladoMarco)}`;
+    }
+
+    // 2. Renderizar Cards em Linha do Tempo
+    const timelineContainer = document.getElementById('savingsTimelineContainer');
+    if (timelineContainer) {
+      timelineContainer.innerHTML = projectionData.map((d, index) => {
+        const isLast = (index === projectionData.length - 1);
+        const pctProgresso = totalAcumuladoMarco > 0 ? Math.round((d.acumuladoPoupanca / totalAcumuladoMarco) * 100) : 0;
+
+        return `
+          <div class="timeline-step ${isLast ? 'highlight' : ''}">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span class="time">${d.name} / ${d.year}</span>
+              ${isLast 
+                ? '<span class="badge badge-gold" style="font-size:11px;"><i class="ph-bold ph-trophy"></i> Meta Final</span>' 
+                : `<span class="badge badge-subtle" style="font-size:11px;">Mês ${index + 1} de 6</span>`}
+            </div>
+            <strong>${formatMoney(d.acumuladoPoupanca)}</strong>
+            <small style="color:var(--text-muted);">+ ${formatMoney(d.metaMes)} guardados no mês</small>
+            <div style="margin-top: 8px;">
+              <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:3px; color:var(--text-dim);">
+                <span>Progresso</span>
+                <span>${pctProgresso}%</span>
+              </div>
+              <div style="width:100%; height:6px; background:rgba(255,255,255,0.08); border-radius:4px; overflow:hidden;">
+                <div style="width:${pctProgresso}%; height:100%; background:${isLast ? 'var(--gold)' : 'var(--success)'}; border-radius:4px;"></div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // 3. Renderizar Tabela Detalhada
+    const tbody = document.getElementById('savingsProjectionTableBody');
+    if (tbody) {
+      tbody.innerHTML = projectionData.map((d, index) => {
+        const pctBadge = d.pctSobra > 100
+          ? `<span class="badge badge-danger">${d.pctSobra}%</span>`
+          : `<span class="badge badge-green">${d.pctSobra}%</span>`;
+
+        const livreClass = d.livreMes >= 0 ? 'text-accent-blue' : 'text-danger';
+
+        return `
+          <tr style="${d.isCurrent ? 'background: rgba(59, 130, 246, 0.08); font-weight: 500;' : ''}">
+            <td>
+              <strong>${d.name} / ${d.year}</strong>
+              ${d.isCurrent ? '<span class="badge badge-blue" style="margin-left:6px;">Mês Atual</span>' : ''}
+            </td>
+            <td><strong class="text-success">${formatMoney(d.totalGeralMes)}</strong></td>
+            <td><strong class="text-danger">${formatMoney(d.totalDespesasComFaturas)}</strong></td>
+            <td><strong class="${d.sobraMes >= 0 ? 'text-gold' : 'text-danger'}">${formatMoney(d.sobraMes)}</strong></td>
+            <td>
+              <div class="sobra-real-input-wrapper" style="max-width: 130px;">
+                <span class="prefix" style="font-size:0.75rem;">R$</span>
+                <input type="number" step="0.01" class="sobra-real-input" 
+                       style="padding: 4px 6px 4px 26px; font-size: 0.88rem; width: 110px;"
+                       value="${d.metaMes}" 
+                       onchange="app.updateSingleMonthSavingsGoal('${d.key}', this.value)"
+                       title="Ajustar meta deste mês">
+              </div>
+            </td>
+            <td>${pctBadge}</td>
+            <td><strong class="${livreClass}">${formatMoney(d.livreMes)}</strong></td>
+            <td><strong class="text-success" style="font-size:1.05rem;">${formatMoney(d.acumuladoPoupanca)}</strong></td>
+            <td class="text-right">
+              <button class="btn-secondary btn-sm" onclick="app.setPeriod('${d.key}'); app.switchTab('dashboard');" title="Abrir este mês no painel principal">
+                <i class="ph ph-calendar-blank"></i> Abrir
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // 4. Renderizar Gráfico Interativo de Poupança Acumulada
+    this.renderSavingsProjectionChart(projectionData);
+  },
+
+  renderSavingsProjectionChart(projectionData) {
+    if (typeof Chart === 'undefined') return;
+    const canvas = document.getElementById('savingsProjectionChart');
+    if (!canvas) return;
+
+    if (this.savingsProjectionChartInstance) {
+      this.savingsProjectionChartInstance.destroy();
+    }
+
+    const isDark = document.body.classList.contains('theme-dark');
+    const textColor = isDark ? '#94A3B8' : '#475569';
+    const gridColor = isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)';
+
+    const labels = projectionData.map(d => `${d.name}/${String(d.year).slice(2)}`);
+    const dataAcumulado = projectionData.map(d => d.acumuladoPoupanca);
+    const dataMeta = projectionData.map(d => d.metaMes);
+    const dataSobra = projectionData.map(d => Math.max(0, d.sobraMes));
+
+    const ctx = canvas.getContext('2d');
+    const gradientAcumulado = ctx.createLinearGradient(0, 0, 0, 300);
+    gradientAcumulado.addColorStop(0, 'rgba(16, 185, 129, 0.35)');
+    gradientAcumulado.addColorStop(1, 'rgba(16, 185, 129, 0.02)');
+
+    this.savingsProjectionChartInstance = new Chart(ctx, {
+      data: {
+        labels,
+        datasets: [
+          {
+            type: 'line',
+            label: 'Poupança Acumulada (R$)',
+            data: dataAcumulado,
+            borderColor: '#10B981',
+            backgroundColor: gradientAcumulado,
+            borderWidth: 3,
+            fill: true,
+            tension: 0.35,
+            pointBackgroundColor: '#10B981',
+            pointBorderColor: '#FFFFFF',
+            pointBorderWidth: 2,
+            pointRadius: 6,
+            pointHoverRadius: 9,
+            order: 1
+          },
+          {
+            type: 'bar',
+            label: 'Meta a Guardar no Mês (R$)',
+            data: dataMeta,
+            backgroundColor: 'rgba(245, 158, 11, 0.8)',
+            borderColor: '#F59E0B',
+            borderWidth: 1,
+            borderRadius: 6,
+            order: 2
+          },
+          {
+            type: 'bar',
+            label: 'Sobra Líquida Prevista (R$)',
+            data: dataSobra,
+            backgroundColor: 'rgba(59, 130, 246, 0.45)',
+            borderColor: '#3B82F6',
+            borderWidth: 1,
+            borderRadius: 6,
+            order: 3
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+          mode: 'index',
+          intersect: false
+        },
+        plugins: {
+          legend: {
+            position: 'top',
+            labels: {
+              color: textColor,
+              font: { size: 12, weight: 600 },
+              usePointStyle: true,
+              padding: 16
+            }
+          },
+          tooltip: {
+            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+            titleColor: '#F8FAFC',
+            bodyColor: '#E2E8F0',
+            borderColor: 'rgba(255, 255, 255, 0.1)',
+            borderWidth: 1,
+            padding: 12,
+            callbacks: {
+              label: (ctx) => ` ${ctx.dataset.label}: ${formatMoney(ctx.raw)}`
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: { color: textColor, font: { weight: 600 } }
+          },
+          y: {
+            grid: { color: gridColor },
+            ticks: {
+              color: textColor,
+              callback: (val) => formatMoney(val)
+            }
+          }
+        }
+      }
+    });
   },
 
   // ==========================================

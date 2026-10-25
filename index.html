@@ -209,7 +209,10 @@
                 <i class="ph-bold ph-target text-gold"></i>
                 <h3>Meta de Poupança do Mês</h3>
               </div>
-              <button class="btn-text-edit" id="btnEditarMeta"><i class="ph ph-pencil-simple"></i> Ajustar Meta</button>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <button type="button" class="btn-text-edit" onclick="app.switchTab('poupanca')"><i class="ph-bold ph-chart-line-up"></i> Ver Projeção até Março ➔</button>
+                <button type="button" class="btn-text-edit" id="btnEditarMeta"><i class="ph ph-pencil-simple"></i> Ajustar Meta</button>
+              </div>
             </div>
             <p id="metaStatusText">Você definiu guardar <strong>R$ 1.500,00</strong> este mês.</p>
           </div>
@@ -725,25 +728,119 @@
       <section id="section-poupanca" class="content-section">
         <div class="section-header-banner">
           <div>
-            <h2>Plano de Poupança & Reserva</h2>
-            <p>Defina o quanto vocês querem economizar todo mês e acompanhe o crescimento do patrimônio.</p>
+            <h2><i class="ph-bold ph-piggy-bank text-gold"></i> Projeção de Poupança (Outubro/2026 a Março/2027)</h2>
+            <p>Acompanhe a projeção acumulada da sua meta de guardar mês a mês, desde o início do controle até Março de 2027.</p>
           </div>
-          <button class="btn-primary" id="btnConfigPoupanca">
-            <i class="ph-bold ph-gear"></i> Configurar Meta
-          </button>
+          <div class="btn-group">
+            <span class="badge badge-gold" style="font-size: 0.88rem; padding: 8px 14px; display: inline-flex; align-items: center; gap: 6px;">
+              <i class="ph-bold ph-calendar-check"></i> Outubro/2026 ➔ Março/2027 (6 meses)
+            </span>
+          </div>
         </div>
 
-        <div class="poupanca-cards-grid">
+        <!-- 4 CARDS DE MÉTRICAS CONSOLIDADAS DA PROJEÇÃO -->
+        <div class="poupanca-cards-grid" style="margin-bottom: 24px;">
           <div class="poupanca-stat-card">
-            <span class="label">Meta Mensal Estabelecida</span>
-            <div class="val" id="poupancaMetaValor">R$ 1.500,00</div>
-            <span class="sub" id="poupancaMetaPercentSalario">Aprox. 20% da renda fixa</span>
+            <span class="label"><i class="ph-bold ph-target text-gold"></i> Meta Mensal Base de Poupança</span>
+            <div class="val text-gold" id="projMetaMensalBase">R$ 0,00</div>
+            <span class="sub" id="projMetaMensalPct">Equivale a aprox. 0% da renda</span>
           </div>
 
           <div class="poupanca-stat-card">
-            <span class="label">Disponível para Poupar no Mês</span>
-            <div class="val text-success" id="poupancaDisponivelMes">R$ 0,00</div>
-            <span class="sub">Após pagar todas as despesas e faturas</span>
+            <span class="label"><i class="ph-bold ph-vault text-success"></i> Poupança Acumulada em 6 Meses</span>
+            <div class="val text-success" id="projTotalAcumuladoMarco">R$ 0,00</div>
+            <span class="sub" id="projTotalAcumuladoSub">Total guardado até Março/2027</span>
+          </div>
+
+          <div class="poupanca-stat-card">
+            <span class="label"><i class="ph-bold ph-scales text-accent-blue"></i> Sobra Líquida Prevista no Período</span>
+            <div class="val text-accent-blue" id="projTotalSobraPeriodo">R$ 0,00</div>
+            <span class="sub" id="projSobraCompromissadaSub">0% da sobra será guardada</span>
+          </div>
+
+          <div class="poupanca-stat-card">
+            <span class="label"><i class="ph-bold ph-trend-up text-purple"></i> Patrimônio Projetado (Março/2027)</span>
+            <div class="val text-purple" id="projPatrimonioMarco">R$ 0,00</div>
+            <span class="sub" id="projCrescimentoPatrimonioSub">+R$ 0,00 sobre o saldo atual</span>
+          </div>
+        </div>
+
+        <!-- BARRA RÁPIDA DE DEFINIÇÃO DE META PARA A PROJEÇÃO -->
+        <div class="sobra-real-panel" style="margin-bottom: 24px;">
+          <div class="sobra-real-row">
+            <div class="sobra-real-info">
+              <div class="sobra-real-icon">
+                <i class="ph-bold ph-sliders"></i>
+              </div>
+              <div class="sobra-real-titles">
+                <h5>Definir Meta de Poupança para os 6 Meses (Outubro a Março)</h5>
+                <p>Altere a meta de economia e replique para todos os meses do período ou ajuste individualmente na tabela:</p>
+              </div>
+            </div>
+
+            <div class="sobra-real-controls">
+              <div class="sobra-real-input-wrapper">
+                <span class="prefix">R$</span>
+                <input type="number" step="0.01" id="inputMetaProjecaoGeral" class="sobra-real-input" placeholder="4000,00" onkeyup="if(event.key==='Enter') app.applyProjectionGoalToAll()">
+              </div>
+              <button type="button" class="btn-primary btn-sm" onclick="app.applyProjectionGoalToAll()">
+                <i class="ph-bold ph-check"></i> Aplicar aos 6 Meses
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- GRÁFICO INTERATIVO DE PROJEÇÃO DE POUPANÇA -->
+        <div class="chart-card" style="margin-bottom: 24px; min-height: 400px;">
+          <div class="card-header-flex">
+            <div>
+              <h3><i class="ph-bold ph-chart-line-up text-success"></i> Evolução da Poupança Acumulada: Outubro/2026 até Março/2027</h3>
+              <span class="sub">Curva de crescimento do dinheiro guardado mês a mês comparado com a sobra líquida prevista</span>
+            </div>
+            <span class="badge badge-green" id="badgeProjGoalFinal">Meta Acumulada: R$ 0,00</span>
+          </div>
+          <div class="chart-wrapper" style="height: 330px; position: relative;">
+            <canvas id="savingsProjectionChart"></canvas>
+          </div>
+        </div>
+
+        <!-- CARDS EM LINHA DO TEMPO: O CRESCIMENTO MÊS A MÊS -->
+        <div class="simulador-poupanca-box" style="margin-bottom: 24px;">
+          <h3><i class="ph-bold ph-path text-gold"></i> Linha do Tempo da Poupança Acumulada</h3>
+          <p>Veja o valor acumulado no cofre ao término de cada mês até Março de 2027:</p>
+          <div class="timeline-projections" id="savingsTimelineContainer">
+            <!-- Gerado dinamicamente via JS -->
+          </div>
+        </div>
+
+        <!-- TABELA DETALHADA MÊS A MÊS (OUTUBRO A MARÇO) -->
+        <div class="chart-card">
+          <div class="card-header-flex">
+            <div>
+              <h3><i class="ph-bold ph-table"></i> Demonstrativo Mensal da Poupança (Outubro/2026 a Março/2027)</h3>
+              <span class="sub">Detalhamento de receitas, despesas, sobra, meta individual de poupança e saldo acumulado</span>
+            </div>
+          </div>
+
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Mês / Ano</th>
+                  <th>Ganhos Previstos</th>
+                  <th>Despesas Totais</th>
+                  <th>Sobra Líquida</th>
+                  <th>Meta a Guardar</th>
+                  <th>% da Sobra</th>
+                  <th>Livre na Conta</th>
+                  <th>Acumulado Poupado</th>
+                  <th class="text-right">Ação</th>
+                </tr>
+              </thead>
+              <tbody id="savingsProjectionTableBody">
+                <!-- Gerado dinamicamente via JS -->
+              </tbody>
+            </table>
           </div>
         </div>
       </section>
