@@ -392,30 +392,40 @@
 
           <!-- Salário Dia 15 (Adiantamento) -->
           <div class="salary-card">
-            <div class="salary-header">
-              <div class="user-avatar andressa"><i class="ph-bold ph-calendar-blank"></i></div>
-              <div>
-                <h4>Salário Dia 15</h4>
-                <span class="badge badge-subtle">1ª Quinzena (Adiantamento)</span>
+            <div class="salary-header" style="justify-content: space-between;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <div class="user-avatar andressa"><i class="ph-bold ph-calendar-blank"></i></div>
+                <div>
+                  <h4>Salário Dia 15</h4>
+                  <span class="badge badge-subtle">1ª Quinzena</span>
+                </div>
               </div>
+              <button class="salary-status-btn badge-green" id="salaryDia15StatusBtn" onclick="app.toggleSalaryReceived('dia15')" title="Clique para alternar Recebido / Pendente">
+                ✓ Recebido
+              </button>
             </div>
             <div class="salary-amount text-accent-blue" id="salaryDia15Display">R$ 0,00</div>
           </div>
 
           <!-- Salário Dia 30 (Fechamento) -->
           <div class="salary-card">
-            <div class="salary-header">
-              <div class="user-avatar andressa"><i class="ph-bold ph-calendar-check"></i></div>
-              <div>
-                <h4>Salário Dia 30</h4>
-                <span class="badge badge-subtle">2ª Quinzena (Fechamento)</span>
+            <div class="salary-header" style="justify-content: space-between;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <div class="user-avatar andressa"><i class="ph-bold ph-calendar-check"></i></div>
+                <div>
+                  <h4>Salário Dia 30</h4>
+                  <span class="badge badge-subtle">2ª Quinzena</span>
+                </div>
               </div>
+              <button class="salary-status-btn badge-gold" id="salaryDia30StatusBtn" onclick="app.toggleSalaryReceived('dia30')" title="Clique para alternar Recebido / Pendente">
+                ⏳ Pendente
+              </button>
             </div>
             <div class="salary-amount text-accent-blue" id="salaryDia30Display">R$ 0,00</div>
           </div>
 
           <!-- Total Salários Andressa -->
-          <div class="salary-card highlight-income">
+          <div class="salary-card">
             <div class="salary-header">
               <div class="user-avatar andressa">A</div>
               <div>
@@ -424,10 +434,13 @@
               </div>
             </div>
             <div class="salary-amount" id="salaryAndressaDisplay">R$ 0,00</div>
+            <small style="color:var(--text-muted); font-size:0.75rem; display:block; margin-top:4px;" id="salaryReceivedBreakdown">
+              Recebido: R$ 0,00 • Pendente: R$ 0,00
+            </small>
           </div>
 
           <!-- Consultorias no Mês Selecionado -->
-          <div class="salary-card highlight-income">
+          <div class="salary-card">
             <div class="salary-header">
               <div class="user-avatar consultoria"><i class="ph-bold ph-briefcase"></i></div>
               <div>
@@ -436,6 +449,30 @@
               </div>
             </div>
             <div class="salary-amount text-success" id="consultancyTotalDisplay">R$ 0,00</div>
+            <small style="color:var(--text-muted); font-size:0.75rem; display:block; margin-top:4px;" id="consultancyReceivedBreakdown">
+              Recebido: R$ 0,00 • Pendente: R$ 0,00
+            </small>
+          </div>
+        </div>
+
+        <!-- Resumo Consolidado de Rendas do Mês: Total Geral & Já Recebido -->
+        <div class="income-consolidated-grid" id="incomeConsolidatedGrid">
+          <div class="inc-summary-card highlight-total">
+            <span class="label"><i class="ph-bold ph-calendar-star"></i> TOTAL GERAL DO MÊS</span>
+            <div class="value" id="incomeTotalGeralMes">R$ 0,00</div>
+            <span class="sub" id="incomeTotalGeralSub">Salários + Consultorias Previstas</span>
+          </div>
+
+          <div class="inc-summary-card highlight-received">
+            <span class="label"><i class="ph-bold ph-check-circle"></i> TOTAL JÁ RECEBIDO</span>
+            <div class="value" id="incomeTotalRecebidoMes">R$ 0,00</div>
+            <span class="sub" id="incomeTotalRecebidoSub">Entrou na conta no mês selecionado</span>
+          </div>
+
+          <div class="inc-summary-card highlight-pending">
+            <span class="label"><i class="ph-bold ph-clock"></i> PENDENTE A RECEBER</span>
+            <div class="value" id="incomeTotalPendenteMes">R$ 0,00</div>
+            <span class="sub" id="incomeTotalPendenteSub">Aguardando recebimento no mês</span>
           </div>
         </div>
 

@@ -552,6 +552,47 @@ const app = {
     return expense.dueDate || `${monthKey}-10`;
   },
 
+  // Helper para verificar se um pagamento de salário foi recebido no mês selecionado
+  isSalaryReceived(dayKey, monthKey = this.getCurrentMonthKey()) {
+    if (!this.data.salaries) return false;
+    if (this.data.salaries.receivedMonths && 
+        this.data.salaries.receivedMonths[monthKey] && 
+        this.data.salaries.receivedMonths[monthKey][dayKey] !== undefined) {
+      return !!this.data.salaries.receivedMonths[monthKey][dayKey];
+    }
+    // Fallback padrão:
+    // Para Outubro/2026, dia 15 = true (recebido), dia 30 = false (pendente)
+    if (monthKey === '2026-10') {
+      return dayKey === 'dia15';
+    }
+    return false;
+  },
+
+  // Alternar status de recebimento do salário (dia15 ou dia30) para o mês selecionado
+  toggleSalaryReceived(dayKey, monthKey = this.getCurrentMonthKey()) {
+    if (!this.data.salaries) this.data.salaries = {};
+    if (!this.data.salaries.receivedMonths) this.data.salaries.receivedMonths = {};
+    if (!this.data.salaries.receivedMonths[monthKey]) {
+      this.data.salaries.receivedMonths[monthKey] = {
+        dia15: this.isSalaryReceived('dia15', monthKey),
+        dia30: this.isSalaryReceived('dia30', monthKey)
+      };
+    }
+
+    const currentStatus = this.isSalaryReceived(dayKey, monthKey);
+    const newStatus = !currentStatus;
+    this.data.salaries.receivedMonths[monthKey][dayKey] = newStatus;
+
+    this.saveData();
+    this.renderAll();
+
+    const labelDay = dayKey === 'dia15' ? 'Salário Dia 15' : 'Salário Dia 30';
+    const monthLabel = this.formatMonthKeyLabel(monthKey);
+    this.showToast(newStatus 
+      ? `${labelDay} marcado como RECEBIDO em ${monthLabel}!` 
+      : `${labelDay} marcado como PENDENTE em ${monthLabel}.`);
+  },
+
   // ==========================================
   // CÁLCULOS PRINCIPAIS
   // ==========================================
@@ -585,10 +626,16 @@ const app = {
 
     // Salários Fixos (Dia 15 e Dia 30)
     const salarioVitor = 0;
-    const salarioDia15 = Number(this.data.salaries?.dia15) ?? 2900.00;
-    const salarioDia30 = Number(this.data.salaries?.dia30) ?? 2900.00;
+    const salarioDia15 = Number(this.data.salaries?.dia15) ?? 2400.00;
+    const salarioDia30 = Number(this.data.salaries?.dia30) ?? 3400.00;
     const salarioAndressa = salarioDia15 + salarioDia30;
     const salariosTotal = salarioAndressa;
+
+    // Status de Recebimento de Salários no Mês Ativo
+    const salarioDia15Recebido = this.isSalaryReceived('dia15', monthKey) ? salarioDia15 : 0;
+    const salarioDia30Recebido = this.isSalaryReceived('dia30', monthKey) ? salarioDia30 : 0;
+    const salariosRecebidosTotal = salarioDia15Recebido + salarioDia30Recebido;
+    const salariosPendentesTotal = salariosTotal - salariosRecebidosTotal;
 
     // Consultorias (PUXAR APENAS AS DO MÊS SELECIONADO)
     const consultoriasDoMes = this.data.consultancies.filter(c => c.date && c.date.startsWith(monthKey));
@@ -600,9 +647,21 @@ const app = {
       .reduce((acc, c) => acc + (Number(c.amount) || 0), 0);
     const consultoriasTotal = consultoriasRecebidas + consultoriasPendentes;
 
-    // Total de Entradas no Mês (Salários Fixos + Consultorias Recebidas)
-    const totalEntradas = salariosTotal + consultoriasRecebidas;
-    const totalEntradasPrevistas = salariosTotal + consultoriasTotal;
+    // ========================================================
+    // TOTAIS CONSOLIDADOS DE ENTRADAS / RECEITAS DO MÊS
+    // ========================================================
+    // TOTAL GERAL DO MÊS (Previsto: Salários + Consultorias)
+    const totalGeralMes = salariosTotal + consultoriasTotal;
+
+    // TOTAL JÁ RECEBIDO NO MÊS (Salários Recebidos + Consultorias Recebidas)
+    const totalRecebidoMes = salariosRecebidosTotal + consultoriasRecebidas;
+
+    // TOTAL PENDENTE A RECEBER NO MÊS
+    const totalPendenteMes = salariosPendentesTotal + consultoriasPendentes;
+
+    // Total de Entradas Realizadas (usado para fluxo de caixa do momento)
+    const totalEntradas = totalRecebidoMes;
+    const totalEntradasPrevistas = totalGeralMes;
 
     // Despesas do Mês:
     // 1. Contas Fixas (ocorrem todo mês)
@@ -620,8 +679,10 @@ const app = {
     // Despesas Totais do Mês = Contas Cadastradas + Faturas de Cartão
     const totalDespesasComFaturas = totalDespesasCadastradas + totalFaturas;
 
-    // Sobra Líquida do Mês
-    const sobraMes = totalEntradas - totalDespesasComFaturas;
+    // Sobra Líquida do Mês (Considerando o Total Geral Previsto)
+    const sobraMes = totalGeralMes - totalDespesasComFaturas;
+    // Sobra Realizada no Momento (Já Recebido - Despesas Totais)
+    const sobraRealizada = totalRecebidoMes - totalDespesasComFaturas;
 
     // Contas Pendentes a Pagar no Mês Selecionado
     const contasFixasPendentes = this.data.expenses
@@ -651,10 +712,17 @@ const app = {
       salarioDia30,
       salarioAndressa,
       salariosTotal,
+      salarioDia15Recebido,
+      salarioDia30Recebido,
+      salariosRecebidosTotal,
+      salariosPendentesTotal,
       consultoriasDoMes,
       consultoriasRecebidas,
       consultoriasPendentes,
       consultoriasTotal,
+      totalGeralMes,
+      totalRecebidoMes,
+      totalPendenteMes,
       totalEntradas,
       totalEntradasPrevistas,
       despesasFixas,
@@ -663,6 +731,7 @@ const app = {
       totalDespesasComFaturas,
       totalDespesasPendentes,
       sobraMes,
+      sobraRealizada,
       patrimonioTotal
     };
   },
@@ -689,7 +758,7 @@ const app = {
 
     document.getElementById('kpiSaldoContas').textContent = formatMoney(t.saldoContas);
     document.getElementById('kpiFgts').textContent = formatMoney(t.fgtsTotal);
-    document.getElementById('kpiEntradas').textContent = formatMoney(t.totalEntradas);
+    document.getElementById('kpiEntradas').textContent = formatMoney(t.totalRecebidoMes);
     document.getElementById('kpiDespesas').textContent = formatMoney(t.totalDespesasComFaturas);
     
     const sobraEl = document.getElementById('kpiSobraMes');
@@ -700,10 +769,15 @@ const app = {
       sobraEl.className = 'kpi-value text-danger';
     }
 
+    const sobraDescEl = document.getElementById('kpiSobraDesc');
+    if (sobraDescEl) {
+      sobraDescEl.textContent = `Previsto: ${formatMoney(t.sobraMes)} • Já Realizado: ${formatMoney(t.sobraRealizada)}`;
+    }
+
     document.getElementById('kpiPatrimonioTotal').textContent = formatMoney(t.patrimonioTotal);
 
     // Badges dos KPIs
-    document.getElementById('kpiConsultoriaBadge').textContent = `Consultorias Recebidas: ${formatMoney(t.consultoriasRecebidas)}`;
+    document.getElementById('kpiConsultoriaBadge').textContent = `Total Previsto: ${formatMoney(t.totalGeralMes)} (Faltam ${formatMoney(t.totalPendenteMes)})`;
     document.getElementById('kpiFaturasBadge').textContent = `Faturas: ${formatMoney(t.totalFaturas)}`;
   },
 
@@ -1082,21 +1156,72 @@ const app = {
     const monthName = this.getMonthName();
     const year = this.currentDate.getFullYear();
 
+    // 1. Valores dos Salários
     const salaryDia15Display = document.getElementById('salaryDia15Display');
-    if (salaryDia15Display) {
-      salaryDia15Display.textContent = formatMoney(t.salarioDia15);
-    }
+    if (salaryDia15Display) salaryDia15Display.textContent = formatMoney(t.salarioDia15);
+
     const salaryDia30Display = document.getElementById('salaryDia30Display');
-    if (salaryDia30Display) {
-      salaryDia30Display.textContent = formatMoney(t.salarioDia30);
-    }
+    if (salaryDia30Display) salaryDia30Display.textContent = formatMoney(t.salarioDia30);
+
     const salaryAndressaDisplay = document.getElementById('salaryAndressaDisplay');
-    if (salaryAndressaDisplay) {
-      salaryAndressaDisplay.textContent = formatMoney(t.salarioAndressa);
+    if (salaryAndressaDisplay) salaryAndressaDisplay.textContent = formatMoney(t.salariosTotal);
+
+    // 2. Botões de Status Interativos para Salário Dia 15 e Dia 30
+    const isDia15Received = this.isSalaryReceived('dia15', monthKey);
+    const btnDia15 = document.getElementById('salaryDia15StatusBtn');
+    if (btnDia15) {
+      btnDia15.className = `salary-status-btn ${isDia15Received ? 'badge-green' : 'badge-gold'}`;
+      btnDia15.innerHTML = isDia15Received ? '<i class="ph-bold ph-check"></i> Recebido' : '<i class="ph-bold ph-clock"></i> Pendente';
+      btnDia15.title = `Clique para alternar: ${isDia15Received ? 'Marcar como Pendente' : 'Marcar como Recebido'}`;
+    }
+
+    const isDia30Received = this.isSalaryReceived('dia30', monthKey);
+    const btnDia30 = document.getElementById('salaryDia30StatusBtn');
+    if (btnDia30) {
+      btnDia30.className = `salary-status-btn ${isDia30Received ? 'badge-green' : 'badge-gold'}`;
+      btnDia30.innerHTML = isDia30Received ? '<i class="ph-bold ph-check"></i> Recebido' : '<i class="ph-bold ph-clock"></i> Pendente';
+      btnDia30.title = `Clique para alternar: ${isDia30Received ? 'Marcar como Pendente' : 'Marcar como Recebido'}`;
+    }
+
+    // 3. Detalhamento Recebido / Pendente nos Cards
+    const salaryBreakdownEl = document.getElementById('salaryReceivedBreakdown');
+    if (salaryBreakdownEl) {
+      salaryBreakdownEl.innerHTML = `Recebido: <strong class="text-success">${formatMoney(t.salariosRecebidosTotal)}</strong> • Pendente: <strong class="text-gold">${formatMoney(t.salariosPendentesTotal)}</strong>`;
+    }
+
+    const consultBreakdownEl = document.getElementById('consultancyReceivedBreakdown');
+    if (consultBreakdownEl) {
+      consultBreakdownEl.innerHTML = `Recebido: <strong class="text-success">${formatMoney(t.consultoriasRecebidas)}</strong> • Pendente: <strong class="text-gold">${formatMoney(t.consultoriasPendentes)}</strong>`;
     }
 
     document.getElementById('consultancyTotalDisplay').textContent = formatMoney(t.consultoriasTotal);
     document.getElementById('consultanciesCountBadge').textContent = `${t.consultoriasDoMes.length} no mês`;
+
+    // 4. Resumo Consolidado de Rendas do Mês (Total Geral & Já Recebido)
+    const incTotalGeralEl = document.getElementById('incomeTotalGeralMes');
+    if (incTotalGeralEl) incTotalGeralEl.textContent = formatMoney(t.totalGeralMes);
+
+    const incTotalGeralSub = document.getElementById('incomeTotalGeralSub');
+    if (incTotalGeralSub) {
+      incTotalGeralSub.textContent = `Salários (${formatMoney(t.salariosTotal)}) + Consultorias (${formatMoney(t.consultoriasTotal)})`;
+    }
+
+    const incTotalRecebidoEl = document.getElementById('incomeTotalRecebidoMes');
+    if (incTotalRecebidoEl) incTotalRecebidoEl.textContent = formatMoney(t.totalRecebidoMes);
+
+    const incTotalRecebidoSub = document.getElementById('incomeTotalRecebidoSub');
+    if (incTotalRecebidoSub) {
+      const pct = t.totalGeralMes > 0 ? Math.round((t.totalRecebidoMes / t.totalGeralMes) * 100) : 0;
+      incTotalRecebidoSub.textContent = `${pct}% do total previsto já na conta`;
+    }
+
+    const incTotalPendenteEl = document.getElementById('incomeTotalPendenteMes');
+    if (incTotalPendenteEl) incTotalPendenteEl.textContent = formatMoney(t.totalPendenteMes);
+
+    const incTotalPendenteSub = document.getElementById('incomeTotalPendenteSub');
+    if (incTotalPendenteSub) {
+      incTotalPendenteSub.textContent = `Aguardando entrada em ${monthName}`;
+    }
 
     const subEl = document.getElementById('consultancyPeriodSub');
     if (subEl) {
@@ -2061,14 +2186,21 @@ const app = {
   // Modal Salário Fixo (Dia 15 e Dia 30)
   openSalariesModal() {
     const salaries = this.normalizeSalaries(this.data.salaries);
-    const dia15 = Number(salaries.dia15) || 2900.00;
-    const dia30 = Number(salaries.dia30) || 2900.00;
+    const dia15 = Number(salaries.dia15) || 2400.00;
+    const dia30 = Number(salaries.dia30) || 3400.00;
     const total = dia15 + dia30;
+
+    const monthKey = this.getCurrentMonthKey();
+    const monthName = this.getMonthName();
+    const year = this.currentDate.getFullYear();
+
+    const isDia15Received = this.isSalaryReceived('dia15', monthKey);
+    const isDia30Received = this.isSalaryReceived('dia30', monthKey);
 
     const html = `
       <form onsubmit="event.preventDefault(); app.saveSalaries();">
         <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:16px;">
-          Configure os dois pagamentos mensais do salário líquido da Andressa (Dia 15 e Dia 30):
+          Configure os dois pagamentos mensais do salário líquido da Andressa (Dia 15 e Dia 30) e marque se já foram recebidos:
         </p>
 
         <div class="form-row">
@@ -2088,6 +2220,22 @@ const app = {
               <input type="number" step="0.01" id="salaryDia30Input" class="form-control" style="padding-left:36px;" value="${dia30}" oninput="app.updateModalSalariesTotal()">
             </div>
             <small style="color:var(--text-muted); font-size:0.75rem;">2ª Quinzena</small>
+          </div>
+        </div>
+
+        <div style="background:var(--bg-card-solid); border:1px solid var(--border-color); border-radius:var(--radius-md); padding:12px 16px; margin-bottom:16px;">
+          <label style="font-weight:700; font-size:0.85rem; color:var(--text-main); display:block; margin-bottom:8px;">
+            <i class="ph-bold ph-calendar"></i> Status em ${monthName} / ${year}:
+          </label>
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.85rem;">
+              <input type="checkbox" id="modalSalaryDia15Received" ${isDia15Received ? 'checked' : ''} style="width:18px; height:18px;">
+              <span>Salário Dia 15 já recebido em ${monthName}</span>
+            </label>
+            <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.85rem;">
+              <input type="checkbox" id="modalSalaryDia30Received" ${isDia30Received ? 'checked' : ''} style="width:18px; height:18px;">
+              <span>Salário Dia 30 já recebido em ${monthName}</span>
+            </label>
           </div>
         </div>
 
@@ -2117,7 +2265,19 @@ const app = {
     const d30 = parseFloat(document.getElementById('salaryDia30Input')?.value) || 0;
     const total = d15 + d30;
 
+    const isDia15Received = document.getElementById('modalSalaryDia15Received')?.checked || false;
+    const isDia30Received = document.getElementById('modalSalaryDia30Received')?.checked || false;
+    const monthKey = this.getCurrentMonthKey();
+
+    if (!this.data.salaries) this.data.salaries = {};
+    if (!this.data.salaries.receivedMonths) this.data.salaries.receivedMonths = {};
+    this.data.salaries.receivedMonths[monthKey] = {
+      dia15: isDia15Received,
+      dia30: isDia30Received
+    };
+
     this.data.salaries = {
+      ...this.data.salaries,
       vitor: 0,
       dia15: d15,
       dia30: d30,

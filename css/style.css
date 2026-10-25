@@ -693,6 +693,89 @@ body {
   color: var(--text-dim);
 }
 
+/* Resumo Consolidado de Receitas */
+.income-consolidated-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.inc-summary-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: var(--transition);
+}
+
+.inc-summary-card.highlight-received {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(5, 150, 105, 0.2));
+  border-color: rgba(16, 185, 129, 0.35);
+}
+
+.inc-summary-card.highlight-pending {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(217, 119, 6, 0.2));
+  border-color: rgba(245, 158, 11, 0.35);
+}
+
+.inc-summary-card.highlight-total {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(37, 99, 235, 0.2));
+  border-color: rgba(59, 130, 246, 0.35);
+}
+
+.inc-summary-card .label {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.inc-summary-card .value {
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+.inc-summary-card.highlight-received .value {
+  color: #34D399;
+}
+
+.inc-summary-card.highlight-pending .value {
+  color: #FBBF24;
+}
+
+.inc-summary-card.highlight-total .value {
+  color: #60A5FA;
+}
+
+.inc-summary-card .sub {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+.salary-status-btn {
+  border: none;
+  cursor: pointer;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: var(--transition);
+}
+
+.salary-status-btn:hover {
+  filter: brightness(1.15);
+  transform: translateY(-1px);
+}
+
 .text-success { color: var(--success) !important; }
 .text-danger { color: var(--danger) !important; }
 .text-gold { color: var(--gold) !important; }
