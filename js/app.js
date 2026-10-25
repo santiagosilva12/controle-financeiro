@@ -870,7 +870,10 @@ const app = {
   // Barra de Progresso da Poupança no Topo
   renderSavingsGoal() {
     const t = this.getTotals();
-    const meta = Number(this.data.savingsGoal) || 2000.00;
+    const monthKey = this.getCurrentMonthKey();
+    const meta = (this.data.monthlySavingsGoals && this.data.monthlySavingsGoals[monthKey] !== undefined)
+      ? Number(this.data.monthlySavingsGoals[monthKey])
+      : (Number(this.data.savingsGoal) || 2000.00);
     // O valor poupável real é a sobra do mês (se positiva)
     const guardadoReal = Math.max(0, t.sobraMes);
     const percent = Math.min(100, Math.round((guardadoReal / meta) * 100));
@@ -1325,6 +1328,9 @@ const app = {
       incTotalPendenteSub.textContent = `Aguardando entrada em ${monthName}`;
     }
 
+    // 5. Balanço do Mês: Ganhos x Despesas & Simulador de Poupança
+    this.renderIncomeBalanceAndPlanner(t);
+
     const subEl = document.getElementById('consultancyPeriodSub');
     if (subEl) {
       subEl.textContent = `Registros de consultorias e reembolsos previstos ou recebidos em ${monthName} / ${year}`;
@@ -1427,6 +1433,114 @@ const app = {
       this.renderAll();
       this.showToast('Item removido com sucesso!');
     }
+  },
+
+  // ==========================================
+  // BALANÇO FINANCEIRO & SIMULADOR DE POUPANÇA
+  // ==========================================
+  renderIncomeBalanceAndPlanner(t) {
+    const monthKey = this.getCurrentMonthKey();
+    const monthName = this.getMonthName();
+    const year = this.currentDate.getFullYear();
+
+    const badgeMonth = document.getElementById('balanceMonthBadge');
+    if (badgeMonth) badgeMonth.textContent = `${monthName} / ${year}`;
+
+    // Equação de Subtração (Ganhos - Despesas = Sobra)
+    const eqGanhos = document.getElementById('eqTotalGanhos');
+    if (eqGanhos) eqGanhos.textContent = formatMoney(t.totalGeralMes);
+
+    const eqDespesas = document.getElementById('eqTotalDespesas');
+    if (eqDespesas) eqDespesas.textContent = formatMoney(t.totalDespesasComFaturas);
+
+    const eqSobra = document.getElementById('eqSobraMes');
+    if (eqSobra) {
+      eqSobra.textContent = formatMoney(t.sobraMes);
+      eqSobra.className = t.sobraMes >= 0 ? 'eq-val text-gold' : 'eq-val text-danger';
+    }
+
+    const eqSobraSub = document.getElementById('eqSobraMesSub');
+    if (eqSobraSub) {
+      eqSobraSub.textContent = `Previsto: ${formatMoney(t.sobraMes)} • Já Realizado: ${formatMoney(t.sobraRealizada)}`;
+    }
+
+    // Carregar meta atual de poupança deste mês
+    const metaMes = (this.data.monthlySavingsGoals && this.data.monthlySavingsGoals[monthKey] !== undefined)
+      ? Number(this.data.monthlySavingsGoals[monthKey])
+      : (Number(this.data.savingsGoal) || 2000.00);
+
+    const inputMeta = document.getElementById('inputMetaPouparMes');
+    if (inputMeta && document.activeElement !== inputMeta) {
+      inputMeta.value = metaMes;
+    }
+
+    this.updateSavingsPlannerPreview(metaMes, t);
+  },
+
+  updateSavingsPlannerPreview(val, totals = null) {
+    const t = totals || this.getTotals();
+    const sobra = Math.max(0, t.sobraMes);
+    const numVal = parseFloat(val) || 0;
+
+    const displayPoupar = document.getElementById('plannerPouparDisplay');
+    if (displayPoupar) displayPoupar.textContent = formatMoney(numVal);
+
+    const pct = sobra > 0 ? Math.round((numVal / sobra) * 100) : 0;
+    const displayPct = document.getElementById('plannerPouparPctDisplay');
+    if (displayPct) displayPct.textContent = `${pct}%`;
+
+    const livre = Math.max(0, sobra - numVal);
+    const displayLivre = document.getElementById('plannerLivreDisplay');
+    if (displayLivre) displayLivre.textContent = formatMoney(livre);
+
+    const bar = document.getElementById('plannerProgressBar');
+    if (bar) {
+      bar.style.width = `${Math.min(100, pct)}%`;
+      bar.style.background = pct > 100 
+        ? 'linear-gradient(90deg, #EF4444, #DC2626)' 
+        : 'linear-gradient(90deg, #10B981, #F59E0B)';
+    }
+  },
+
+  applySavingsPercent(pct) {
+    const t = this.getTotals();
+    const sobra = Math.max(0, t.sobraMes);
+    const calculated = Math.round((sobra * (pct / 100)) * 100) / 100;
+
+    const inputMeta = document.getElementById('inputMetaPouparMes');
+    if (inputMeta) {
+      inputMeta.value = calculated;
+    }
+
+    document.querySelectorAll('.btn-percent-pill').forEach(btn => {
+      const match = btn.textContent.includes(`${pct}%`);
+      btn.classList.toggle('active', match);
+    });
+
+    this.updateSavingsPlannerPreview(calculated, t);
+  },
+
+  saveMonthSavingsGoal() {
+    const inputMeta = document.getElementById('inputMetaPouparMes');
+    const val = inputMeta ? parseFloat(inputMeta.value) : 0;
+
+    if (isNaN(val) || val < 0) {
+      alert('Por favor, informe um valor de poupança válido.');
+      return;
+    }
+
+    const monthKey = this.getCurrentMonthKey();
+    const monthName = this.getMonthName();
+
+    if (!this.data.monthlySavingsGoals) {
+      this.data.monthlySavingsGoals = {};
+    }
+    this.data.monthlySavingsGoals[monthKey] = val;
+    this.data.savingsGoal = val;
+
+    this.saveData();
+    this.renderAll();
+    this.showToast(`Meta de poupança de ${monthName} definida para ${formatMoney(val)}!`);
   },
 
   // ==========================================
@@ -1587,7 +1701,10 @@ const app = {
   // ==========================================
   renderSavingsSection() {
     const t = this.getTotals();
-    const meta = Number(this.data.savingsGoal) || 2000;
+    const monthKey = this.getCurrentMonthKey();
+    const meta = (this.data.monthlySavingsGoals && this.data.monthlySavingsGoals[monthKey] !== undefined)
+      ? Number(this.data.monthlySavingsGoals[monthKey])
+      : (Number(this.data.savingsGoal) || 2000.00);
     document.getElementById('poupancaMetaValor').textContent = formatMoney(meta);
     
     const pctRenda = t.salariosTotal > 0 ? Math.round((meta / t.salariosTotal) * 100) : 0;

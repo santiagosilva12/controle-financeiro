@@ -498,6 +498,88 @@
           </div>
         </div>
 
+        <!-- BALANÇO FINANCEIRO DO MÊS & SIMULADOR DE POUPANÇA -->
+        <div class="income-balance-box">
+          <div class="income-balance-header">
+            <div>
+              <h3><i class="ph-bold ph-scales text-gold"></i> Balanço do Mês: Ganhos x Despesas</h3>
+              <span class="sub">Subtração em tempo real de todas as receitas menos despesas e faturas para saber exatamente quanto vai sobrar no mês.</span>
+            </div>
+            <span class="badge badge-subtle" id="balanceMonthBadge">Outubro / 2026</span>
+          </div>
+
+          <!-- Equação Visual da Subtração -->
+          <div class="balance-equation-grid">
+            <div class="equation-card income">
+              <span class="eq-tag">Total de Ganhos</span>
+              <div class="eq-val text-success" id="eqTotalGanhos">R$ 0,00</div>
+              <span class="eq-sub" id="eqTotalGanhosSub">Salários + Consultorias + Reembolsos</span>
+            </div>
+
+            <div class="equation-operator"><i class="ph-bold ph-minus"></i></div>
+
+            <div class="equation-card expense">
+              <span class="eq-tag">Total Despesas + Faturas</span>
+              <div class="eq-val text-danger" id="eqTotalDespesas">R$ 0,00</div>
+              <span class="eq-sub" id="eqTotalDespesasSub">Fixas + Variáveis + Faturas</span>
+            </div>
+
+            <div class="equation-operator"><i class="ph-bold ph-equals"></i></div>
+
+            <div class="equation-card result">
+              <span class="eq-tag">Sobra Líquida do Mês</span>
+              <div class="eq-val text-gold" id="eqSobraMes">R$ 0,00</div>
+              <span class="eq-sub" id="eqSobraMesSub">Disponível para poupar / reserva</span>
+            </div>
+          </div>
+
+          <!-- Planejador Interativo: Quanto Deseja Poupar com base no Resultado -->
+          <div class="savings-planner-container">
+            <div class="planner-header">
+              <div class="planner-title">
+                <i class="ph-bold ph-piggy-bank text-gold"></i>
+                <div>
+                  <h4>Quanto deseja poupar com base no resultado deste mês?</h4>
+                  <p>Defina o valor a guardar da sobra líquida. Escolha um atalho rápido de porcentagem ou digite um valor livre:</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="planner-controls-row">
+              <!-- Botões rápidos de porcentagem -->
+              <div class="planner-percent-buttons">
+                <button type="button" class="btn-percent-pill" onclick="app.applySavingsPercent(20)">20% da sobra</button>
+                <button type="button" class="btn-percent-pill" onclick="app.applySavingsPercent(30)">30% da sobra</button>
+                <button type="button" class="btn-percent-pill active" onclick="app.applySavingsPercent(50)">50% da sobra</button>
+                <button type="button" class="btn-percent-pill" onclick="app.applySavingsPercent(70)">70% da sobra</button>
+                <button type="button" class="btn-percent-pill" onclick="app.applySavingsPercent(100)">100% (Tudo)</button>
+              </div>
+
+              <!-- Input de valor livre e botão de salvar -->
+              <div class="planner-input-group">
+                <div class="input-prefix-wrapper">
+                  <span class="prefix">R$</span>
+                  <input type="number" step="0.01" id="inputMetaPouparMes" class="planner-input" placeholder="0,00" oninput="app.updateSavingsPlannerPreview(this.value)">
+                </div>
+                <button type="button" class="btn-primary" onclick="app.saveMonthSavingsGoal()">
+                  <i class="ph-bold ph-check"></i> Definir Meta
+                </button>
+              </div>
+            </div>
+
+            <!-- Feedback de Resultado e Barra Visual -->
+            <div class="planner-results-feedback">
+              <div class="feedback-stats">
+                <span>Guardar p/ Poupança: <strong class="text-success" id="plannerPouparDisplay">R$ 0,00</strong> (<span id="plannerPouparPctDisplay">0%</span> da sobra)</span>
+                <span>Livre para Outros Gastos / Reserva: <strong class="text-accent-blue" id="plannerLivreDisplay">R$ 0,00</strong></span>
+              </div>
+              <div class="planner-progress-track">
+                <div class="planner-progress-fill" id="plannerProgressBar" style="width: 0%;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Tabela de Consultorias & Reembolsos -->
         <div class="table-container">
           <div class="table-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
