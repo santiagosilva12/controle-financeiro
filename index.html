@@ -527,9 +527,57 @@
             <div class="equation-operator"><i class="ph-bold ph-equals"></i></div>
 
             <div class="equation-card result">
-              <span class="eq-tag">Sobra Líquida do Mês</span>
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span class="eq-tag">Sobra Líquida do Mês</span>
+                <button type="button" class="btn-table-icon" onclick="document.getElementById('inputSobraRealMes').focus();" title="Informar ou ajustar Sobra Líquida Real" style="font-size:14px; color:var(--gold);">
+                  <i class="ph ph-pencil-simple"></i>
+                </button>
+              </div>
               <div class="eq-val text-gold" id="eqSobraMes">R$ 0,00</div>
               <span class="eq-sub" id="eqSobraMesSub">Disponível para poupar / reserva</span>
+            </div>
+          </div>
+
+          <!-- Opção: Sobra Líquida Real / Estimada -->
+          <div class="sobra-real-panel">
+            <div class="sobra-real-row">
+              <div class="sobra-real-info">
+                <div class="sobra-real-icon">
+                  <i class="ph-bold ph-coins"></i>
+                </div>
+                <div class="sobra-real-titles">
+                  <h5>
+                    Sobra Líquida Real / Estimada 
+                    <span class="badge badge-subtle" id="sobraRealMonthBadge">Outubro / 2026</span>
+                    <span class="badge badge-green" id="sobraRealActiveTag" style="display:none;"><i class="ph-bold ph-check"></i> Somado aos Ganhos</span>
+                  </h5>
+                  <p>Informe a sobra real ou saldo em conta para somar nos ganhos deste mês:</p>
+                </div>
+              </div>
+
+              <div class="sobra-real-controls">
+                <div class="sobra-real-input-wrapper">
+                  <span class="prefix">R$</span>
+                  <input type="number" step="0.01" id="inputSobraRealMes" class="sobra-real-input" placeholder="0,00" onchange="app.saveSobraRealConfig()" onkeyup="if(event.key==='Enter') app.saveSobraRealConfig()">
+                </div>
+
+                <label class="sobra-real-checkbox-label" title="Se marcado, este valor é somado ao Total de Ganhos do mês">
+                  <input type="checkbox" id="checkSomarGanhosSobraReal" onchange="app.saveSobraRealConfig()" checked>
+                  <span><i class="ph-bold ph-plus-circle"></i> Somar aos Ganhos</span>
+                </label>
+
+                <button type="button" class="btn-primary btn-sm" onclick="app.saveSobraRealConfig()">
+                  <i class="ph-bold ph-check"></i> Aplicar
+                </button>
+                <button type="button" class="btn-table-icon delete" onclick="app.clearSobraRealConfig()" title="Limpar sobra real deste mês">
+                  <i class="ph ph-trash"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="sobra-real-feedback" id="sobraRealFeedback" style="display:none;">
+              <i class="ph-bold ph-info"></i>
+              <span id="sobraRealFeedbackText"></span>
             </div>
           </div>
 

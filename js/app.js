@@ -46,6 +46,8 @@ const defaultData = {
     andressa: 5800.00
   },
   savingsGoal: 2500.00,
+  monthlySavingsGoals: {},
+  sobraReal: {},
   fgts: {
     vitor: 0,
     andressa: 14200.00
@@ -292,6 +294,12 @@ const app = {
                 };
               }
             });
+          }
+          if (!this.data.sobraReal) {
+            this.data.sobraReal = {};
+          }
+          if (!this.data.monthlySavingsGoals) {
+            this.data.monthlySavingsGoals = {};
           }
         }
       } catch (e) {
@@ -656,6 +664,9 @@ const app = {
         totalDespesasCadastradas: 0,
         totalDespesasComFaturas: 0,
         totalDespesasPendentes: 0,
+        sobraRealAmount: 0,
+        somarGanhosSobraReal: true,
+        adicionalSobraGanhos: 0,
         sobraMes: 0,
         sobraRealizada: 0
       };
@@ -712,9 +723,24 @@ const app = {
     const extrasRecebidosTotal = consultoriasRecebidas + reembolsosRecebidos;
     const extrasPendentesTotal = consultoriasPendentes + reembolsosPendentes;
 
+    // Sobra Líquida Real (Estimada / Saldo Anterior) informada pelo usuário
+    const sobraRealCfg = (this.data.sobraReal && this.data.sobraReal[monthKey]) 
+      ? this.data.sobraReal[monthKey] 
+      : null;
+    let sobraRealAmount = 0;
+    let somarGanhosSobraReal = true;
+    if (typeof sobraRealCfg === 'number') {
+      sobraRealAmount = sobraRealCfg;
+      somarGanhosSobraReal = true;
+    } else if (sobraRealCfg && typeof sobraRealCfg === 'object') {
+      sobraRealAmount = Number(sobraRealCfg.amount) || 0;
+      somarGanhosSobraReal = sobraRealCfg.somarGanhos !== false;
+    }
+    const adicionalSobraGanhos = (somarGanhosSobraReal && sobraRealAmount > 0) ? sobraRealAmount : 0;
+
     // TOTAIS CONSOLIDADOS DE ENTRADAS / RECEITAS DO MÊS
-    const totalGeralMes = salariosTotal + extrasTotal;
-    const totalRecebidoMes = salariosRecebidosTotal + extrasRecebidosTotal;
+    const totalGeralMes = salariosTotal + extrasTotal + adicionalSobraGanhos;
+    const totalRecebidoMes = salariosRecebidosTotal + extrasRecebidosTotal + adicionalSobraGanhos;
     const totalPendenteMes = salariosPendentesTotal + extrasPendentesTotal;
 
     const totalEntradas = totalRecebidoMes;
@@ -784,6 +810,9 @@ const app = {
       totalDespesasCadastradas,
       totalDespesasComFaturas,
       totalDespesasPendentes,
+      sobraRealAmount,
+      somarGanhosSobraReal,
+      adicionalSobraGanhos,
       sobraMes,
       sobraRealizada
     };
@@ -1307,7 +1336,8 @@ const app = {
       const parts = [`Salários (${formatMoney(t.salariosTotal)})`];
       if (t.consultoriasTotal > 0) parts.push(`Consultorias (${formatMoney(t.consultoriasTotal)})`);
       if (t.reembolsosTotal > 0) parts.push(`Reembolsos (${formatMoney(t.reembolsosTotal)})`);
-      if (t.consultoriasTotal === 0 && t.reembolsosTotal === 0) parts.push('Nenhuma renda extra');
+      if (t.adicionalSobraGanhos > 0) parts.push(`Sobra Real (${formatMoney(t.sobraRealAmount)})`);
+      if (t.consultoriasTotal === 0 && t.reembolsosTotal === 0 && t.adicionalSobraGanhos === 0) parts.push('Nenhuma renda extra');
       incTotalGeralSub.textContent = parts.join(' + ');
     }
 
@@ -1450,6 +1480,15 @@ const app = {
     const eqGanhos = document.getElementById('eqTotalGanhos');
     if (eqGanhos) eqGanhos.textContent = formatMoney(t.totalGeralMes);
 
+    const eqGanhosSub = document.getElementById('eqTotalGanhosSub');
+    if (eqGanhosSub) {
+      if (t.adicionalSobraGanhos > 0) {
+        eqGanhosSub.textContent = `Salários + Extras + Sobra Real (${formatMoney(t.sobraRealAmount)})`;
+      } else {
+        eqGanhosSub.textContent = 'Salários + Consultorias + Reembolsos';
+      }
+    }
+
     const eqDespesas = document.getElementById('eqTotalDespesas');
     if (eqDespesas) eqDespesas.textContent = formatMoney(t.totalDespesasComFaturas);
 
@@ -1461,7 +1500,44 @@ const app = {
 
     const eqSobraSub = document.getElementById('eqSobraMesSub');
     if (eqSobraSub) {
-      eqSobraSub.textContent = `Previsto: ${formatMoney(t.sobraMes)} • Já Realizado: ${formatMoney(t.sobraRealizada)}`;
+      const extraTag = (t.adicionalSobraGanhos > 0) ? ' (inclui Sobra Real)' : '';
+      eqSobraSub.textContent = `Previsto: ${formatMoney(t.sobraMes)}${extraTag} • Já Realizado: ${formatMoney(t.sobraRealizada)}`;
+    }
+
+    // Configuração de Sobra Líquida Real deste mês
+    const inputSobraReal = document.getElementById('inputSobraRealMes');
+    if (inputSobraReal && document.activeElement !== inputSobraReal) {
+      inputSobraReal.value = t.sobraRealAmount > 0 ? t.sobraRealAmount : '';
+    }
+
+    const checkSomar = document.getElementById('checkSomarGanhosSobraReal');
+    if (checkSomar) {
+      checkSomar.checked = t.somarGanhosSobraReal !== false;
+    }
+
+    const badgeSobraRealMonth = document.getElementById('sobraRealMonthBadge');
+    if (badgeSobraRealMonth) {
+      badgeSobraRealMonth.textContent = `${monthName} / ${year}`;
+    }
+
+    const tagSobraReal = document.getElementById('sobraRealActiveTag');
+    if (tagSobraReal) {
+      tagSobraReal.style.display = (t.sobraRealAmount > 0 && t.somarGanhosSobraReal) ? 'inline-flex' : 'none';
+    }
+
+    const feedbackSobraReal = document.getElementById('sobraRealFeedback');
+    const feedbackText = document.getElementById('sobraRealFeedbackText');
+    if (feedbackSobraReal && feedbackText) {
+      if (t.sobraRealAmount > 0) {
+        feedbackSobraReal.style.display = 'flex';
+        if (t.somarGanhosSobraReal) {
+          feedbackText.innerHTML = `<strong>Sobra Real aplicada:</strong> O valor de <strong class="text-success">${formatMoney(t.sobraRealAmount)}</strong> foi somado aos ganhos de ${monthName}. Seu saldo total do mês agora é <strong class="text-success">${formatMoney(t.totalGeralMes)}</strong>.`;
+        } else {
+          feedbackText.innerHTML = `<strong>Sobra Real registrada:</strong> O valor de <strong class="text-gold">${formatMoney(t.sobraRealAmount)}</strong> está anotado apenas como referência (não somado aos ganhos).`;
+        }
+      } else {
+        feedbackSobraReal.style.display = 'none';
+      }
     }
 
     // Carregar meta atual de poupança deste mês
@@ -1541,6 +1617,52 @@ const app = {
     this.saveData();
     this.renderAll();
     this.showToast(`Meta de poupança de ${monthName} definida para ${formatMoney(val)}!`);
+  },
+
+  saveSobraRealConfig() {
+    const input = document.getElementById('inputSobraRealMes');
+    const chk = document.getElementById('checkSomarGanhosSobraReal');
+    const val = input ? parseFloat(input.value) : 0;
+    const somar = chk ? chk.checked : true;
+
+    const monthKey = this.getCurrentMonthKey();
+    const monthName = this.getMonthName();
+
+    if (!this.data.sobraReal) {
+      this.data.sobraReal = {};
+    }
+
+    if (isNaN(val) || val <= 0) {
+      delete this.data.sobraReal[monthKey];
+      this.saveData();
+      this.renderAll();
+      this.showToast(`Sobra real de ${monthName} redefinida para R$ 0,00.`);
+      return;
+    }
+
+    this.data.sobraReal[monthKey] = {
+      amount: val,
+      somarGanhos: somar
+    };
+
+    this.saveData();
+    this.renderAll();
+
+    const msg = somar
+      ? `Sobra real de ${formatMoney(val)} aplicada e SOMADA aos ganhos de ${monthName}!`
+      : `Sobra real de ${formatMoney(val)} registrada para ${monthName} (não somada aos ganhos).`;
+    this.showToast(msg);
+  },
+
+  clearSobraRealConfig() {
+    const monthKey = this.getCurrentMonthKey();
+    const monthName = this.getMonthName();
+    if (this.data.sobraReal && this.data.sobraReal[monthKey]) {
+      delete this.data.sobraReal[monthKey];
+      this.saveData();
+      this.renderAll();
+      this.showToast(`Sobra real de ${monthName} limpa com sucesso.`);
+    }
   },
 
   // ==========================================
@@ -1843,7 +1965,10 @@ const app = {
             </td>
             <td>${formatMoney(d.salariosTotal)}</td>
             <td>${d.consultoriasTotal > 0 ? `<strong class="text-success">${formatMoney(d.consultoriasTotal)}</strong>` : '<span class="text-muted">R$ 0,00</span>'}</td>
-            <td><strong class="text-success">${formatMoney(d.totalGeralMes)}</strong></td>
+            <td>
+              <strong class="text-success">${formatMoney(d.totalGeralMes)}</strong>
+              ${d.adicionalSobraGanhos > 0 ? `<br><small class="badge badge-gold" style="font-size:10px;" title="Inclui sobra real de ${formatMoney(d.sobraRealAmount)}">+ Sobra Real</small>` : ''}
+            </td>
             <td>${formatMoney(d.despesasFixas)}</td>
             <td>${d.despesasVariaveis > 0 ? formatMoney(d.despesasVariaveis) : '<span class="text-muted">R$ 0,00</span>'}</td>
             <td>${d.totalFaturas > 0 ? `<strong class="text-purple">${formatMoney(d.totalFaturas)}</strong>` : '<span class="text-muted">R$ 0,00</span>'}</td>
