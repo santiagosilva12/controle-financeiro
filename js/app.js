@@ -1593,8 +1593,8 @@ const app = {
     const pctRenda = t.salariosTotal > 0 ? Math.round((meta / t.salariosTotal) * 100) : 0;
     document.getElementById('poupancaMetaPercentSalario').textContent = `Equivale a aprox. ${pctRenda}% da renda fixa conjunta`;
 
-    document.getElementById('poupancaDisponivelMes').textContent = formatMoney(Math.max(0, t.sobraMes));
-    document.getElementById('poupancaRicoValor').textContent = formatMoney(t.saldoRico);
+    const poupancaDisponivelMes = document.getElementById('poupancaDisponivelMes');
+    if (poupancaDisponivelMes) poupancaDisponivelMes.textContent = formatMoney(Math.max(0, t.sobraMes));
   },
 
   // ==========================================
